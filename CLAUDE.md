@@ -1,4 +1,4 @@
-# CrawlerBlocker
+# Tarpit
 
 FastAPI service. Python 3.13 managed by `uv`.
 
@@ -8,14 +8,14 @@ FastAPI service. Python 3.13 managed by `uv`.
   - Add runtime dep: `uv add <pkg>`
   - Add dev dep: `uv add --dev <pkg>`
   - Run commands: `uv run <cmd>`
-- Run the app: `uv run crawlerblocker` (or `uv run uvicorn crawlerblocker:app --reload`).
+- Run the app: `uv run tarpit` (or `uv run uvicorn tarpit:app --reload`).
 - Run tests: `uv run pytest -q`.
 
 ## Layout
 
-- Source: `src/crawlerblocker/`
-- Routers: `src/crawlerblocker/routers/<resource>.py` — one file per resource, exports `router = APIRouter(...)`.
-- Settings: `src/crawlerblocker/settings.py` — pydantic-settings, env prefix `CRAWLERBLOCKER_`.
+- Source: `src/tarpit/`
+- Routers: `src/tarpit/routers/<resource>.py` — one file per resource, exports `router = APIRouter(...)`.
+- Settings: `src/tarpit/settings.py` — pydantic-settings, env prefix `TARPIT_`.
 - Tests: `tests/test_<thing>.py`, mirroring the source tree.
 
 ## Code standards

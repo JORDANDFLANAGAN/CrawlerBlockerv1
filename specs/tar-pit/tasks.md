@@ -22,7 +22,7 @@
 - **Depends on:** —
 - **Parallel group:** W1 (serial — hard blocker for everything else)
 - **Acceptance:**
-  - [ ] `src/crawlerblocker/` no longer exists; `src/tarpit/` exists with empty `__init__.py` and `routers/__init__.py`
+  - [~] `src/crawlerblocker/` no longer exists; `src/tarpit/` exists with empty `__init__.py` and `routers/__init__.py`
   - [ ] `pyproject.toml`: `[project.name] = "tarpit"`; `[project.scripts]` entry is `tarpit = "tarpit:main"`
   - [ ] `.env.example` keys renamed from `CRAWLERBLOCKER_*` to `TARPIT_*` with the full set from [design.md §2.2 settings](./design.md#srctarpitsettingspy) (`TARPIT_HOST`, `TARPIT_PORT`, `TARPIT_RELOAD`, `TARPIT_LOG_LEVEL`, `TARPIT_CORPUS_PATH`, `TARPIT_LOG_PATH`, `TARPIT_DELAY_MIN_S`, `TARPIT_DELAY_MAX_S`)
   - [ ] `.env.example` default for `TARPIT_RELOAD` is `false` (design decision — reload is opt-in)
