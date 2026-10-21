@@ -18,13 +18,13 @@
 - **Depends on:** —
 - **Parallel group:** W1 (serial — hard blocker for everything else)
 - **Acceptance:**
-  - [ ] `src/tarpit/detection/__init__.py` exists and is empty (no stubs for state/log/signals/middleware — those are owned by later tasks)
-  - [ ] `src/tarpit/settings.py` gains exactly five new fields with the names, types, and defaults from [design.md §2.2 settings.py additions](./design.md#srctarpitsettingspy--additions): `detection_enabled: bool = True`, `detection_log_path: Path = Path("logs/detection.log")`, `detection_rate_budget: int = 60`, `detection_rate_window_s: float = 60.0`, `detection_state_max_entries: int = 10_000`
-  - [ ] All v1 `Settings` fields and defaults remain byte-identical — no reorder, no rename, no default change
-  - [ ] `.env.example` gains exactly five new entries at the bottom: `TARPIT_DETECTION_ENABLED=true`, `TARPIT_DETECTION_LOG_PATH=logs/detection.log`, `TARPIT_DETECTION_RATE_BUDGET=60`, `TARPIT_DETECTION_RATE_WINDOW_S=60.0`, `TARPIT_DETECTION_STATE_MAX_ENTRIES=10000`
-  - [ ] Existing `.env.example` entries unchanged
-  - [ ] `uv run python -c "from tarpit import detection; from tarpit.settings import get_settings; s = get_settings(); assert s.detection_enabled is True and s.detection_rate_budget == 60"` exits 0
-  - [ ] `uv run pytest -q` is green (no regressions — all 64 v1 tests pass)
+  - [x] `src/tarpit/detection/__init__.py` exists and is empty (no stubs for state/log/signals/middleware — those are owned by later tasks)
+  - [x] `src/tarpit/settings.py` gains exactly five new fields with the names, types, and defaults from [design.md §2.2 settings.py additions](./design.md#srctarpitsettingspy--additions): `detection_enabled: bool = True`, `detection_log_path: Path = Path("logs/detection.log")`, `detection_rate_budget: int = 60`, `detection_rate_window_s: float = 60.0`, `detection_state_max_entries: int = 10_000`
+  - [x] All v1 `Settings` fields and defaults remain byte-identical — no reorder, no rename, no default change
+  - [x] `.env.example` gains exactly five new entries at the bottom: `TARPIT_DETECTION_ENABLED=true`, `TARPIT_DETECTION_LOG_PATH=logs/detection.log`, `TARPIT_DETECTION_RATE_BUDGET=60`, `TARPIT_DETECTION_RATE_WINDOW_S=60.0`, `TARPIT_DETECTION_STATE_MAX_ENTRIES=10000`
+  - [x] Existing `.env.example` entries unchanged
+  - [x] `uv run python -c "from tarpit import detection; from tarpit.settings import get_settings; s = get_settings(); assert s.detection_enabled is True and s.detection_rate_budget == 60"` exits 0
+  - [x] `uv run pytest -q` is green (no regressions — all 64 v1 tests pass)
 - **Notes:** Pure plumbing. No new logic. Do **not** stub `state.py`, `signals.py`, `log.py`, or `middleware.py` — those are owned by T2/T3/T5/T7. The empty `__init__.py` is enough to make `tarpit.detection` an importable package for the downstream tasks.
 
 ---
