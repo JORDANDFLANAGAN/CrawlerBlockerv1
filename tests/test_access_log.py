@@ -80,9 +80,8 @@ def test_delay_s_rounded_to_2_decimal_places(tmp_path: Path) -> None:
 
     content = log_file.read_text()
     parsed = json.loads(content.strip())
-    # Should be 3.4, not 3.4000000000001
-    assert parsed["delay_s"] == pytest.approx(3.4, abs=0.001)
-    assert str(parsed["delay_s"]) in ("3.4", "3.40")
+    assert parsed["delay_s"] == 3.4
+    assert str(parsed["delay_s"]) == "3.4"
 
 
 def test_concurrent_append_20_lines(tmp_path: Path) -> None:

@@ -27,11 +27,3 @@ def test_robots_content_type() -> None:
 def test_robots_body_exact() -> None:
     response = client.get("/robots.txt")
     assert response.text == "User-agent: *\nDisallow: /maze/\n"
-
-
-def test_robots_no_log_writer_dependency() -> None:
-    # The root router has no log_writer dependency — verify by inspecting the handler
-    # The handler only calls render_robots_txt() with no side effects
-    response = client.get("/robots.txt")
-    assert response.status_code == 200
-    # Body is pure function output — no logging needed

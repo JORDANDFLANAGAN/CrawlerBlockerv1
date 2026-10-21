@@ -1,5 +1,4 @@
 import random
-from collections.abc import Mapping, Sequence
 
 
 class MarkovChain:
