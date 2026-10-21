@@ -22,14 +22,14 @@
 - **Depends on:** —
 - **Parallel group:** W1 (serial — hard blocker for everything else)
 - **Acceptance:**
-  - [~] `src/crawlerblocker/` no longer exists; `src/tarpit/` exists with empty `__init__.py` and `routers/__init__.py`
-  - [ ] `pyproject.toml`: `[project.name] = "tarpit"`; `[project.scripts]` entry is `tarpit = "tarpit:main"`
-  - [ ] `.env.example` keys renamed from `CRAWLERBLOCKER_*` to `TARPIT_*` with the full set from [design.md §2.2 settings](./design.md#srctarpitsettingspy) (`TARPIT_HOST`, `TARPIT_PORT`, `TARPIT_RELOAD`, `TARPIT_LOG_LEVEL`, `TARPIT_CORPUS_PATH`, `TARPIT_LOG_PATH`, `TARPIT_DELAY_MIN_S`, `TARPIT_DELAY_MAX_S`)
-  - [ ] `.env.example` default for `TARPIT_RELOAD` is `false` (design decision — reload is opt-in)
-  - [ ] `CLAUDE.md` has no remaining references to `crawlerblocker` or `CRAWLERBLOCKER_`; paths updated to `src/tarpit/` and env prefix to `TARPIT_`
-  - [ ] `tests/test_health.py` deleted; `tests/__init__.py` retained
-  - [ ] `uv run python -c "import tarpit"` succeeds (empty package import works)
-  - [ ] `uv run pytest -q` runs with zero tests collected, exit 0 (no stale tests)
+  - [x] `src/crawlerblocker/` no longer exists; `src/tarpit/` exists with empty `__init__.py` and `routers/__init__.py`
+  - [x] `pyproject.toml`: `[project.name] = "tarpit"`; `[project.scripts]` entry is `tarpit = "tarpit:main"`
+  - [x] `.env.example` keys renamed from `CRAWLERBLOCKER_*` to `TARPIT_*` with the full set from [design.md §2.2 settings](./design.md#srctarpitsettingspy) (`TARPIT_HOST`, `TARPIT_PORT`, `TARPIT_RELOAD`, `TARPIT_LOG_LEVEL`, `TARPIT_CORPUS_PATH`, `TARPIT_LOG_PATH`, `TARPIT_DELAY_MIN_S`, `TARPIT_DELAY_MAX_S`)
+  - [x] `.env.example` default for `TARPIT_RELOAD` is `false` (design decision — reload is opt-in)
+  - [x] `CLAUDE.md` has no remaining references to `crawlerblocker` or `CRAWLERBLOCKER_`; paths updated to `src/tarpit/` and env prefix to `TARPIT_`
+  - [x] `tests/test_health.py` deleted; `tests/__init__.py` retained
+  - [x] `uv run python -c "import tarpit"` succeeds (empty package import works)
+  - [x] `uv run pytest -q` runs with zero tests collected, exit 0 (no stale tests)
 - **Notes:** Pure plumbing. No new code logic lands in this task. Do **not** stub out any module files (`markov.py`, `ids.py`, etc.) — those are owned by later tasks and stub files here would collide. Also do **not** delete the `[dependency-groups] dev` block in `pyproject.toml`.
 
 ---
@@ -42,12 +42,12 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `ids.py`](./design.md#srctarpitidspy) exactly: `ID_PATTERN`, `NEW_ID_PATTERN`, `BAIT_ID`, `generate_new_ids`, `is_valid_id`
-  - [ ] `generate_new_ids(random.Random("x"), 10)` returns the **same** list on every call — determinism test
-  - [ ] `generate_new_ids` outputs match `NEW_ID_PATTERN` for every element (4-char lowercase hex) — property-style check over 100 random seeds
-  - [ ] `is_valid_id` returns True for `"root"`, `"a8f3"`, 64-char all-dot `"."*64`, mixed-case alphanum
-  - [ ] `is_valid_id` returns False for `""`, 65-char input, strings containing `/`, `<`, space, `%20`
-  - [ ] `BAIT_ID == "root"` and `is_valid_id(BAIT_ID)` is True — covers REQ-BAIT-03
+  - [x] Public surface matches [design.md §2.2 `ids.py`](./design.md#srctarpitidspy) exactly: `ID_PATTERN`, `NEW_ID_PATTERN`, `BAIT_ID`, `generate_new_ids`, `is_valid_id`
+  - [x] `generate_new_ids(random.Random("x"), 10)` returns the **same** list on every call — determinism test
+  - [x] `generate_new_ids` outputs match `NEW_ID_PATTERN` for every element (4-char lowercase hex) — property-style check over 100 random seeds
+  - [x] `is_valid_id` returns True for `"root"`, `"a8f3"`, 64-char all-dot `"."*64`, mixed-case alphanum
+  - [x] `is_valid_id` returns False for `""`, 65-char input, strings containing `/`, `<`, space, `%20`
+  - [x] `BAIT_ID == "root"` and `is_valid_id(BAIT_ID)` is True — covers REQ-BAIT-03
 - **Notes:** Satisfies REQ-MAZE-01, REQ-MAZE-07 (validation side), and the generation half of REQ-MAZE-03. Tests use seeded `random.Random` directly — no mocks.
 
 ---
@@ -60,13 +60,13 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `markov.py`](./design.md#srctarpitmarkovpy) exactly: `class MarkovChain` with `from_corpus_text` classmethod and `generate` method
-  - [ ] Order is 2 (window of 2 words). Verified by constructing a chain from a known tiny corpus and asserting internal `followers` keys are 2-tuples
-  - [ ] Determinism: `chain.generate(random.Random(42), 50)` returns the same list on every call
-  - [ ] Reproducibility: `MarkovChain.from_corpus_text(same_text).generate(random.Random(42), 50)` returns the same list across chain rebuilds
-  - [ ] Mid-walk dead-end handling: craft a corpus where the walk hits a pair with no followers; `generate` SHALL re-draw a sentence-start pair and never raise — REQ-MAZE-05 behavior
-  - [ ] Sentence-start selection respects `.`, `!`, `?` as sentence terminators
-  - [ ] Tests use a toy inline corpus (10–30 words); do **not** depend on `corpus.txt`
+  - [x] Public surface matches [design.md §2.2 `markov.py`](./design.md#srctarpitmarkovpy) exactly: `class MarkovChain` with `from_corpus_text` classmethod and `generate` method
+  - [x] Order is 2 (window of 2 words). Verified by constructing a chain from a known tiny corpus and asserting internal `followers` keys are 2-tuples
+  - [x] Determinism: `chain.generate(random.Random(42), 50)` returns the same list on every call
+  - [x] Reproducibility: `MarkovChain.from_corpus_text(same_text).generate(random.Random(42), 50)` returns the same list across chain rebuilds
+  - [x] Mid-walk dead-end handling: craft a corpus where the walk hits a pair with no followers; `generate` SHALL re-draw a sentence-start pair and never raise — REQ-MAZE-05 behavior
+  - [x] Sentence-start selection respects `.`, `!`, `?` as sentence terminators
+  - [x] Tests use a toy inline corpus (10–30 words); do **not** depend on `corpus.txt`
 - **Notes:** Satisfies REQ-GEN-01 (training side), REQ-GEN-02 (generation side), REQ-GEN-03 (seeded start). Pure in-memory; no I/O.
 
 ---
@@ -79,13 +79,13 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `renderer.py`](./design.md#srctarpitrendererpy) exactly: `render_robots_txt`, `render_root_page`, `render_maze_page`
-  - [ ] `render_robots_txt()` returns the exact string `"User-agent: *\nDisallow: /maze/\n"` — REQ-ROBOTS-01
-  - [ ] `render_root_page()` output contains the human-copy sentence from [design.md §2.1 `/`](./design.md#get-) verbatim — REQ-BAIT-04
-  - [ ] `render_root_page()` output contains exactly one `<a style="display:none" href="/maze/root">` — REQ-BAIT-01, REQ-BAIT-02, REQ-BAIT-03
-  - [ ] `render_maze_page("a8f3", ["ahab", "whale"], ["1111","2222"])` output: HTML-escapes every inserted value; contains one `<p>` with the joined words; contains exactly 2 anchors with `style="display:none"` and `href="/maze/1111"`, `href="/maze/2222"` — REQ-MAZE-03
-  - [ ] XSS check: `render_maze_page("<x>", ["<script>"], ["<y>"])` output has no raw `<script>` substring; `<` characters appear only as `&lt;` — REQ-GEN / REQ-SEC-01
-  - [ ] No module-level I/O, no `random`, no `datetime` — functions are pure
+  - [x] Public surface matches [design.md §2.2 `renderer.py`](./design.md#srctarpitrendererpy) exactly: `render_robots_txt`, `render_root_page`, `render_maze_page`
+  - [x] `render_robots_txt()` returns the exact string `"User-agent: *\nDisallow: /maze/\n"` — REQ-ROBOTS-01
+  - [x] `render_root_page()` output contains the human-copy sentence from [design.md §2.1 `/`](./design.md#get-) verbatim — REQ-BAIT-04
+  - [x] `render_root_page()` output contains exactly one `<a style="display:none" href="/maze/root">` — REQ-BAIT-01, REQ-BAIT-02, REQ-BAIT-03
+  - [x] `render_maze_page("a8f3", ["ahab", "whale"], ["1111","2222"])` output: HTML-escapes every inserted value; contains one `<p>` with the joined words; contains exactly 2 anchors with `style="display:none"` and `href="/maze/1111"`, `href="/maze/2222"` — REQ-MAZE-03
+  - [x] XSS check: `render_maze_page("<x>", ["<script>"], ["<y>"])` output has no raw `<script>` substring; `<` characters appear only as `&lt;` — REQ-GEN / REQ-SEC-01
+  - [x] No module-level I/O, no `random`, no `datetime` — functions are pure
 - **Notes:** Satisfies REQ-ROBOTS-01, REQ-BAIT-01, REQ-BAIT-02, REQ-BAIT-04, REQ-MAZE-03 shape, REQ-SEC-01. Use `html.escape(..., quote=True)` on every inserted value.
 
 ---
@@ -98,13 +98,13 @@
 - **Depends on:** T1
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `access_log.py`](./design.md#srctarpitaccess_logpy) exactly: `@dataclass(frozen=True) AccessRecord`, `class AccessLogWriter` with `__init__(file, lock)` and `async append(record)`
-  - [ ] Written JSON line matches [design.md §2.4 schema](./design.md#24-access-log-json-schema): key order `ts, ip, ua, path, delay_s`; one line, newline-terminated
-  - [ ] `ua=None` serialises as JSON `null`
-  - [ ] `delay_s` written to 2 decimal places (e.g. `3.4` or `3.42`, never `3.4000000000001`)
-  - [ ] `append` runs the blocking `write + flush` via `asyncio.to_thread`
-  - [ ] Concurrent-append test: fire 20 `append` calls on the same writer with `asyncio.gather`; file has exactly 20 lines, every line is parseable JSON, no interleaved bytes
-  - [ ] `AccessRecord` is frozen (mutation attempt raises `FrozenInstanceError`)
+  - [x] Public surface matches [design.md §2.2 `access_log.py`](./design.md#srctarpitaccess_logpy) exactly: `@dataclass(frozen=True) AccessRecord`, `class AccessLogWriter` with `__init__(file, lock)` and `async append(record)`
+  - [x] Written JSON line matches [design.md §2.4 schema](./design.md#24-access-log-json-schema): key order `ts, ip, ua, path, delay_s`; one line, newline-terminated
+  - [x] `ua=None` serialises as JSON `null`
+  - [x] `delay_s` written to 2 decimal places (e.g. `3.4` or `3.42`, never `3.4000000000001`)
+  - [x] `append` runs the blocking `write + flush` via `asyncio.to_thread`
+  - [x] Concurrent-append test: fire 20 `append` calls on the same writer with `asyncio.gather`; file has exactly 20 lines, every line is parseable JSON, no interleaved bytes
+  - [x] `AccessRecord` is frozen (mutation attempt raises `FrozenInstanceError`)
 - **Notes:** Satisfies REQ-LOG-01 (schema + append-per-request), REQ-LOG-03 (shape forbids extra fields by construction). Tests write to a `tmp_path` file via pytest fixture.
 
 ---
@@ -116,11 +116,11 @@
 - **Depends on:** T1
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `settings.py`](./design.md#srctarpitsettingspy) exactly: `class Settings`, `get_settings()` wrapped in `functools.lru_cache`
-  - [ ] All field names, types, and defaults match the design table exactly
-  - [ ] `reload` default is `False`
-  - [ ] `env_prefix` is `"TARPIT_"` and `env_file` is `".env"`
-  - [ ] Smoke import: `uv run python -c "from tarpit.settings import get_settings; print(get_settings().port)"` prints `8000`
+  - [x] Public surface matches [design.md §2.2 `settings.py`](./design.md#srctarpitsettingspy) exactly: `class Settings`, `get_settings()` wrapped in `functools.lru_cache`
+  - [x] All field names, types, and defaults match the design table exactly
+  - [x] `reload` default is `False`
+  - [x] `env_prefix` is `"TARPIT_"` and `env_file` is `".env"`
+  - [x] Smoke import: `uv run python -c "from tarpit.settings import get_settings; print(get_settings().port)"` prints `8000`
 - **Notes:** No separate test file — pydantic-settings covers its own type coercion; smoke import is enough. If you add behavior beyond field declarations, add tests.
 
 ---
@@ -132,11 +132,11 @@
 - **Depends on:** T1
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] File contains the body text of *Moby-Dick* by Herman Melville (public domain). Source: Project Gutenberg (gutenberg.org/ebooks/2701) plain text download
-  - [ ] Project Gutenberg header (before "*** START OF THE PROJECT GUTENBERG EBOOK …") and footer (from "*** END OF THE PROJECT GUTENBERG EBOOK …") are stripped
-  - [ ] Encoding: UTF-8
-  - [ ] File size roughly 1.0 – 1.3 MB (sanity check — not an exact byte count)
-  - [ ] `uv run python -c "from pathlib import Path; t = Path('src/tarpit/corpus.txt').read_text(); assert 'Call me Ishmael' in t and 'END OF THE PROJECT GUTENBERG' not in t"` exits 0
+  - [x] File contains the body text of *Moby-Dick* by Herman Melville (public domain). Source: Project Gutenberg (gutenberg.org/ebooks/2701) plain text download
+  - [x] Project Gutenberg header (before "*** START OF THE PROJECT GUTENBERG EBOOK …") and footer (from "*** END OF THE PROJECT GUTENBERG EBOOK …") are stripped
+  - [x] Encoding: UTF-8
+  - [x] File size roughly 1.0 – 1.3 MB (sanity check — not an exact byte count)
+  - [x] `uv run python -c "from pathlib import Path; t = Path('src/tarpit/corpus.txt').read_text(); assert 'Call me Ishmael' in t and 'END OF THE PROJECT GUTENBERG' not in t"` exits 0
 - **Notes:** No code. Data drop only. Do **not** commit any Gutenberg boilerplate — that text is licensed separately and we don't want it in our repo.
 
 ---
