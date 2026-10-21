@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     delay_min_s: float = 2.0
     delay_max_s: float = 5.0
 
+    detection_enabled: bool = True
+    detection_log_path: Path = Path("logs/detection.log")
+    detection_rate_budget: int = 60
+    detection_rate_window_s: float = 60.0
+    detection_state_max_entries: int = 10_000
+
 
 @functools.lru_cache
 def get_settings() -> Settings:
