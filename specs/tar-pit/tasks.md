@@ -148,12 +148,12 @@
 - **Depends on:** T1
 - **Parallel group:** W2c
 - **Acceptance:**
-  - [ ] Documents install with `uv sync`
-  - [ ] Documents run with `uv run tarpit` (single uvicorn worker by default — explicit warning not to raise `--workers` in v1)
-  - [ ] Documents the three endpoints: `GET /robots.txt`, `GET /`, `GET /maze/{id}`
-  - [ ] Documents where `access.log` is written (`logs/access.log`, relative to CWD) and that the `logs/` directory is auto-created at startup
-  - [ ] Includes a "Verify v1" section with one shell snippet per Done-when item from [source spec](../../.claude/specs/TarPit.md): robots disallow, curl loop never dead-ends, same URL = identical body, visible 2–5s delay, access log is JSON lines
-  - [ ] Documents `.env` override pattern (copy `.env.example` → `.env`; `TARPIT_*` vars)
+  - [x] Documents install with `uv sync`
+  - [x] Documents run with `uv run tarpit` (single uvicorn worker by default — explicit warning not to raise `--workers` in v1)
+  - [x] Documents the three endpoints: `GET /robots.txt`, `GET /`, `GET /maze/{id}`
+  - [x] Documents where `access.log` is written (`logs/access.log`, relative to CWD) and that the `logs/` directory is auto-created at startup
+  - [x] Includes a "Verify v1" section with one shell snippet per Done-when item from [source spec](../../.claude/specs/TarPit.md): robots disallow, curl loop never dead-ends, same URL = identical body, visible 2–5s delay, access log is JSON lines
+  - [x] Documents `.env` override pattern (copy `.env.example` → `.env`; `TARPIT_*` vars)
 - **Notes:** Satisfies REQ-DOC-01. Keep it tight — one page. No marketing fluff.
 
 ---
@@ -165,11 +165,11 @@
 - **Depends on:** T3, T5, T6
 - **Parallel group:** W3 (serial — single task in wave)
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.3](./design.md#23-fastapi-dependency-contract) exactly: `get_chain(request)`, `get_log_writer(request)`, `get_settings_dep()`
-  - [ ] `get_chain` returns `request.app.state.chain` (type-annotated as `MarkovChain`)
-  - [ ] `get_log_writer` returns `request.app.state.log_writer` (type-annotated as `AccessLogWriter`)
-  - [ ] `get_settings_dep` delegates to `tarpit.settings.get_settings`
-  - [ ] No test file needed — behavior is a one-liner per provider; coverage comes via the router tests in T10/T11
+  - [x] Public surface matches [design.md §2.3](./design.md#23-fastapi-dependency-contract) exactly: `get_chain(request)`, `get_log_writer(request)`, `get_settings_dep()`
+  - [x] `get_chain` returns `request.app.state.chain` (type-annotated as `MarkovChain`)
+  - [x] `get_log_writer` returns `request.app.state.log_writer` (type-annotated as `AccessLogWriter`)
+  - [x] `get_settings_dep` delegates to `tarpit.settings.get_settings`
+  - [x] No test file needed — behavior is a one-liner per provider; coverage comes via the router tests in T10/T11
 - **Notes:** This module is the single seam between the lifespan-managed singletons and the handlers. Changing its contract is a design re-open.
 
 ---
@@ -183,12 +183,12 @@
 - **Depends on:** T4, T9
 - **Parallel group:** W4
 - **Acceptance:**
-  - [ ] `router: APIRouter` exports exactly two routes: `GET /` and `GET /robots.txt`
-  - [ ] `GET /robots.txt`: status 200, `Content-Type: text/plain; charset=utf-8`, body exactly `"User-agent: *\nDisallow: /maze/\n"` — REQ-ROBOTS-01
-  - [ ] `GET /`: status 200, `Content-Type: text/html; charset=utf-8`, body contains the human-copy sentence and the hidden `/maze/root` anchor — REQ-BAIT-01..04
-  - [ ] Neither handler writes an access log line (verified by checking that an injected mock log writer records zero calls)
-  - [ ] Tests construct a minimal `FastAPI()` app in-file and include the router — they do **not** import `tarpit.main.app` (which doesn't exist until T12)
-  - [ ] Tests use `fastapi.testclient.TestClient`
+  - [x] `router: APIRouter` exports exactly two routes: `GET /` and `GET /robots.txt`
+  - [x] `GET /robots.txt`: status 200, `Content-Type: text/plain; charset=utf-8`, body exactly `"User-agent: *\nDisallow: /maze/\n"` — REQ-ROBOTS-01
+  - [x] `GET /`: status 200, `Content-Type: text/html; charset=utf-8`, body contains the human-copy sentence and the hidden `/maze/root` anchor — REQ-BAIT-01..04
+  - [x] Neither handler writes an access log line (verified by checking that an injected mock log writer records zero calls)
+  - [x] Tests construct a minimal `FastAPI()` app in-file and include the router — they do **not** import `tarpit.main.app` (which doesn't exist until T12)
+  - [x] Tests use `fastapi.testclient.TestClient`
 - **Notes:** Satisfies REQ-ROBOTS-01, REQ-BAIT-01, REQ-BAIT-02, REQ-BAIT-03, REQ-BAIT-04. Handlers are thin — they call `render_*` and return the result.
 
 ---
@@ -201,16 +201,16 @@
 - **Depends on:** T2, T3, T4, T5, T9
 - **Parallel group:** W4
 - **Acceptance:**
-  - [ ] `router: APIRouter` exports `GET /maze/{id}` with path param constrained via `Path(..., pattern=r"^[A-Za-z0-9._~-]{1,64}$")` — REQ-MAZE-01, REQ-MAZE-07
-  - [ ] Handler constructs `rng = random.Random(id)`, then: (a) calls `chain.generate(rng, 200)` where 200 is a module-level constant `WORDS_PER_PAGE`, (b) picks `k = rng.randint(5, 10)`, (c) calls `generate_new_ids(rng, k)`, (d) renders via `render_maze_page`, (e) awaits `asyncio.sleep(random.uniform(settings.delay_min_s, settings.delay_max_s))` (module `random`, not the per-request `rng`), (f) appends an `AccessRecord` via the log writer, (g) returns `HTMLResponse` — REQ-MAZE-02..06, REQ-DELAY-01..02, REQ-GEN-02, REQ-LOG-01
-  - [ ] **Determinism test**: with `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0`, two calls to `GET /maze/a8f3` return byte-identical response bodies — REQ-MAZE-02
-  - [ ] **Link count test**: parse the response HTML; the number of `/maze/...` anchors is between 5 and 10 inclusive — REQ-MAZE-03
-  - [ ] **Dead-end test**: every anchor's `href` matches `^/maze/[0-9a-f]{4}$` — REQ-MAZE-03/REQ-MAZE-05 combined
-  - [ ] **Invalid-id tests**: `GET /maze/`, `GET /maze/<script>`, `GET /maze/` + 65×`a` → each returns 404, no response body generation, no access log line written (verified via injected mock writer) — REQ-MAZE-07
-  - [ ] **Delay test**: with `TARPIT_DELAY_MIN_S=0.1 TARPIT_DELAY_MAX_S=0.1`, measure wall-clock between request start and response; assert elapsed ≥ 0.1s — REQ-DELAY-01
-  - [ ] **Log-field test**: inspect the written log record — fields exactly `ts`, `ip`, `ua`, `path`, `delay_s` in that order; `path == "/maze/a8f3"`; no query string even if one is supplied in the URL — REQ-LOG-01, REQ-LOG-03
-  - [ ] **500-path test**: inject a `MarkovChain` whose `generate` raises; response is 500, `Content-Type: text/plain`, body exactly `"internal error"`, **no** access log line written — [design.md §2.1 error path](./design.md#getmazeid)
-  - [ ] Tests construct a minimal FastAPI app in-file with the router included and lifespan singletons overridden via `app.state`
+  - [x] `router: APIRouter` exports `GET /maze/{id}` with path param constrained via `Path(..., pattern=r"^[A-Za-z0-9._~-]{1,64}$")` — REQ-MAZE-01, REQ-MAZE-07
+  - [x] Handler constructs `rng = random.Random(id)`, then: (a) calls `chain.generate(rng, 200)` where 200 is a module-level constant `WORDS_PER_PAGE`, (b) picks `k = rng.randint(5, 10)`, (c) calls `generate_new_ids(rng, k)`, (d) renders via `render_maze_page`, (e) awaits `asyncio.sleep(random.uniform(settings.delay_min_s, settings.delay_max_s))` (module `random`, not the per-request `rng`), (f) appends an `AccessRecord` via the log writer, (g) returns `HTMLResponse` — REQ-MAZE-02..06, REQ-DELAY-01..02, REQ-GEN-02, REQ-LOG-01
+  - [x] **Determinism test**: with `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0`, two calls to `GET /maze/a8f3` return byte-identical response bodies — REQ-MAZE-02
+  - [x] **Link count test**: parse the response HTML; the number of `/maze/...` anchors is between 5 and 10 inclusive — REQ-MAZE-03
+  - [x] **Dead-end test**: every anchor's `href` matches `^/maze/[0-9a-f]{4}$` — REQ-MAZE-03/REQ-MAZE-05 combined
+  - [x] **Invalid-id tests**: `GET /maze/`, `GET /maze/<script>`, `GET /maze/` + 65×`a` → each returns 404, no response body generation, no access log line written (verified via injected mock writer) — REQ-MAZE-07
+  - [x] **Delay test**: with `TARPIT_DELAY_MIN_S=0.1 TARPIT_DELAY_MAX_S=0.1`, measure wall-clock between request start and response; assert elapsed ≥ 0.1s — REQ-DELAY-01
+  - [x] **Log-field test**: inspect the written log record — fields exactly `ts`, `ip`, `ua`, `path`, `delay_s` in that order; `path == "/maze/a8f3"`; no query string even if one is supplied in the URL — REQ-LOG-01, REQ-LOG-03
+  - [x] **500-path test**: inject a `MarkovChain` whose `generate` raises; response is 500, `Content-Type: text/plain`, body exactly `"internal error"`, **no** access log line written — [design.md §2.1 error path](./design.md#getmazeid)
+  - [x] Tests construct a minimal FastAPI app in-file with the router included and lifespan singletons overridden via `app.state`
 - **Notes:** The single largest task. If this feels too big during execution, acceptable split points: (a) handler + its tests, (b) error-path tests. But keep the file ownership as declared.
 
 ---
@@ -224,17 +224,17 @@
 - **Depends on:** T10, T11
 - **Parallel group:** W5 (serial — single task in wave)
 - **Acceptance:**
-  - [ ] `src/tarpit/__init__.py` exports `app` and `main` only
-  - [ ] `main.py` implements `create_app() -> FastAPI` with the lifespan from [design.md §1](./design.md#1-architecture-overview) + §3 lifecycle:
+  - [x] `src/tarpit/__init__.py` exports `app` and `main` only
+  - [x] `main.py` implements `create_app() -> FastAPI` with the lifespan from [design.md §1](./design.md#1-architecture-overview) + §3 lifecycle:
     - reads corpus from `settings.corpus_path`, builds `MarkovChain`, stores on `app.state.chain`
     - creates `settings.log_path.parent` if missing; opens the log file in append mode; constructs `AccessLogWriter` with an `asyncio.Lock`; stores on `app.state.log_writer`
     - closes the log file in the shutdown half of the lifespan
     - includes `root.router` and `maze.router`
-  - [ ] `main()` reads `settings`, calls `uvicorn.run("tarpit:app", host=..., port=..., reload=..., log_level=...)`
-  - [ ] `main()` passes `workers=1` explicitly (or does not set `workers` — the default is 1); if the implementor plans to accept a workers setting, do **not** add one in v1
-  - [ ] **Startup test**: `tests/test_e2e_smoke.py` boots the real app in-process via `uvicorn.Server` on an ephemeral port, hits all three endpoints, asserts status codes and basic shape — including that `logs/access.log` gains one line after a `/maze/{id}` request. Tests force `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0`
-  - [ ] **Corpus-missing test**: starting the lifespan with `settings.corpus_path` pointing to a non-existent file raises at startup (fail-fast — [design.md §6 risks](./design.md#6-risks--edge-cases))
-  - [ ] After this task, `uv run tarpit` starts the service and `uv run pytest -q` is all green
+  - [x] `main()` reads `settings`, calls `uvicorn.run("tarpit:app", host=..., port=..., reload=..., log_level=...)`
+  - [x] `main()` passes `workers=1` explicitly (or does not set `workers` — the default is 1); if the implementor plans to accept a workers setting, do **not** add one in v1
+  - [x] **Startup test**: `tests/test_e2e_smoke.py` boots the real app in-process via `uvicorn.Server` on an ephemeral port, hits all three endpoints, asserts status codes and basic shape — including that `logs/access.log` gains one line after a `/maze/{id}` request. Tests force `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0`
+  - [x] **Corpus-missing test**: starting the lifespan with `settings.corpus_path` pointing to a non-existent file raises at startup (fail-fast — [design.md §6 risks](./design.md#6-risks--edge-cases))
+  - [x] After this task, `uv run tarpit` starts the service and `uv run pytest -q` is all green
 - **Notes:** Final integration. If the e2e smoke test flakes on timing, bump the sleep tolerance — do **not** weaken determinism checks.
 
 ---
