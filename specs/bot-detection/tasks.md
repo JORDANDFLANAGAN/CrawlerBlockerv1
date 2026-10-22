@@ -98,14 +98,14 @@
 - **Depends on:** T2
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `signals.py`](./design.md#srctarpitdetectionsignalspy) exactly: four `SIGNAL_*` string constants (`ua_missing`, `ua_known_bot_pattern`, `rate_exceeded`, `prior_maze_visit`), one `_UA_BOT_PATTERN` compiled regex (private), one `evaluate_request(request, store, now) -> list[str]` function
-  - [ ] UA regex is `re.compile(r"bot|crawler|spider", re.IGNORECASE)` — matches REQ-DET-03 criteria exactly
-  - [ ] `evaluate_request` is a pure read — no mutation of `store`, no I/O (reviewer must confirm no `store.record_request` / `store.mark_maze_visit` calls inside signals.py)
-  - [ ] **Mutual exclusion test**: a request with `User-Agent: ""` returns `["ua_missing"]`, never `["ua_missing", "ua_known_bot_pattern"]`
-  - [ ] **Trigger order test**: a request that trips all four signals (empty UA + rate exceeded + prior maze visit) returns a list in the stable order `["ua_missing", "rate_exceeded", "prior_maze_visit"]` — `ua_known_bot_pattern` cannot co-occur with `ua_missing`
-  - [ ] **UA cases**: missing header → `["ua_missing"]`; empty-string header → `["ua_missing"]`; `"Googlebot/2.1"` → `["ua_known_bot_pattern"]`; `"Mozilla/5.0 ... Chrome/..."` on first visit → `[]`
-  - [ ] **IP source**: `request.client.host or "unknown"` only — reviewer MUST confirm the module reads **no** request headers for IP identification (`X-Forwarded-For`, `X-Real-IP`, etc. never consulted) — REQ-SEC-02
-  - [ ] Tests use a minimal `Request`-like stub (not a full FastAPI app) — unit speed only, no middleware involvement
+  - [x] Public surface matches [design.md §2.2 `signals.py`](./design.md#srctarpitdetectionsignalspy) exactly: four `SIGNAL_*` string constants (`ua_missing`, `ua_known_bot_pattern`, `rate_exceeded`, `prior_maze_visit`), one `_UA_BOT_PATTERN` compiled regex (private), one `evaluate_request(request, store, now) -> list[str]` function
+  - [x] UA regex is `re.compile(r"bot|crawler|spider", re.IGNORECASE)` — matches REQ-DET-03 criteria exactly
+  - [x] `evaluate_request` is a pure read — no mutation of `store`, no I/O (reviewer must confirm no `store.record_request` / `store.mark_maze_visit` calls inside signals.py)
+  - [x] **Mutual exclusion test**: a request with `User-Agent: ""` returns `["ua_missing"]`, never `["ua_missing", "ua_known_bot_pattern"]`
+  - [x] **Trigger order test**: a request that trips all four signals (empty UA + rate exceeded + prior maze visit) returns a list in the stable order `["ua_missing", "rate_exceeded", "prior_maze_visit"]` — `ua_known_bot_pattern` cannot co-occur with `ua_missing`
+  - [x] **UA cases**: missing header → `["ua_missing"]`; empty-string header → `["ua_missing"]`; `"Googlebot/2.1"` → `["ua_known_bot_pattern"]`; `"Mozilla/5.0 ... Chrome/..."` on first visit → `[]`
+  - [x] **IP source**: `request.client.host or "unknown"` only — reviewer MUST confirm the module reads **no** request headers for IP identification (`X-Forwarded-For`, `X-Real-IP`, etc. never consulted) — REQ-SEC-02
+  - [x] Tests use a minimal `Request`-like stub (not a full FastAPI app) — unit speed only, no middleware involvement
 - **Notes:** Satisfies REQ-DET-02 through REQ-DET-05 (signal evaluation) and REQ-DET-06 (OR composition — any signal fires → non-empty list). The hard-rules model (Q2a) is realised by appending to the list rather than scoring.
 
 ---
@@ -117,11 +117,11 @@
 - **Depends on:** T2, T3
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] Two new functions added: `get_detection_store(request) -> DetectionStateStore` and `get_detection_log_writer(request) -> DetectionLogWriter`
-  - [ ] Each returns `request.app.state.detection_store` / `request.app.state.detection_log_writer` respectively, with the correct type annotation imported from `tarpit.detection.state` / `tarpit.detection.log`
-  - [ ] Existing v1 providers (`get_chain`, `get_log_writer`, `get_settings_dep`) are untouched — signatures, bodies, order preserved
-  - [ ] No new test file — these are one-liner delegates; coverage comes via middleware tests in T7 and e2e tests in T9
-  - [ ] Smoke import: `uv run python -c "from tarpit.dependencies import get_detection_store, get_detection_log_writer"` exits 0
+  - [x] Two new functions added: `get_detection_store(request) -> DetectionStateStore` and `get_detection_log_writer(request) -> DetectionLogWriter`
+  - [x] Each returns `request.app.state.detection_store` / `request.app.state.detection_log_writer` respectively, with the correct type annotation imported from `tarpit.detection.state` / `tarpit.detection.log`
+  - [x] Existing v1 providers (`get_chain`, `get_log_writer`, `get_settings_dep`) are untouched — signatures, bodies, order preserved
+  - [x] No new test file — these are one-liner delegates; coverage comes via middleware tests in T7 and e2e tests in T9
+  - [x] Smoke import: `uv run python -c "from tarpit.dependencies import get_detection_store, get_detection_log_writer"` exits 0
 - **Notes:** The middleware (T7) does **not** use these providers — it reads `request.app.state` directly for performance. These exist for test overrides and any future admin routes.
 
 ---
@@ -171,13 +171,13 @@
 - **Depends on:** T1
 - **Parallel group:** W2b
 - **Acceptance:**
-  - [ ] A new section titled "Detection (v2.1)" (or similar) is appended to `README.md` after the existing v1 content
-  - [ ] Documents `TARPIT_DETECTION_ENABLED` as the kill switch (default `true`; set `false` for incident recovery)
-  - [ ] Documents the five `TARPIT_DETECTION_*` env vars with their defaults from design §2.2
-  - [ ] Documents `logs/detection.log` location and schema (one JSON object per line with keys `ts, ip, ua, path, triggers`) — can link to [design.md §2.3](./design.md#23-detection-log-json-schema-v21) rather than duplicate the full schema
-  - [ ] Includes a shell snippet showing how to tail both logs together: `tail -F logs/access.log logs/detection.log`
-  - [ ] Reinforces the **single-worker** requirement: documents that `main.py` passes `workers=1` and warns that detection state is per-process; raising `--workers` would break detection and MUST NOT be done in v2.x
-  - [ ] Does **not** modify the existing v1 Install / Run / Verify sections
+  - [x] A new section titled "Detection (v2.1)" (or similar) is appended to `README.md` after the existing v1 content
+  - [x] Documents `TARPIT_DETECTION_ENABLED` as the kill switch (default `true`; set `false` for incident recovery)
+  - [x] Documents the five `TARPIT_DETECTION_*` env vars with their defaults from design §2.2
+  - [x] Documents `logs/detection.log` location and schema (one JSON object per line with keys `ts, ip, ua, path, triggers`) — can link to [design.md §2.3](./design.md#23-detection-log-json-schema-v21) rather than duplicate the full schema
+  - [x] Includes a shell snippet showing how to tail both logs together: `tail -F logs/access.log logs/detection.log`
+  - [x] Reinforces the **single-worker** requirement: documents that `main.py` passes `workers=1` and warns that detection state is per-process; raising `--workers` would break detection and MUST NOT be done in v2.x
+  - [x] Does **not** modify the existing v1 Install / Run / Verify sections
 - **Notes:** Satisfies REQ-DOC-01 (implicit — mirrors v1 docs practice). Reviewer MUST check that the single-worker warning is explicit and in the user's eyeline, not a footnote.
 
 ---
