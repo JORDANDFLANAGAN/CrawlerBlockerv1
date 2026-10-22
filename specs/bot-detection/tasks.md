@@ -135,8 +135,8 @@
 - **Depends on:** T2, T3, T4, T5
 - **Parallel group:** W3 (serial — single task in wave)
 - **Acceptance:**
-  - [ ] Public API is a single function `register_detection_middleware(app: FastAPI) -> None` — no exported classes, no module-level globals that hold state
-  - [ ] Middleware implements the nine-step ordering from [design.md §2.1](./design.md#21-middleware-contract) **exactly**:
+  - [x] Public API is a single function `register_detection_middleware(app: FastAPI) -> None` — no exported classes, no module-level globals that hold state
+  - [x] Middleware implements the nine-step ordering from [design.md §2.1](./design.md#21-middleware-contract) **exactly**:
     1. Short-circuit on `settings.detection_enabled == False` — no state mutation, no log
     2. Short-circuit on `request.url.path == "/robots.txt"` — no state mutation, no log
     3. `ip = request.client.host or "unknown"`
@@ -146,20 +146,20 @@
     7. If path starts with `/maze/`: `store.mark_maze_visit(ip)` **after** evaluate (so current request doesn't trip itself)
     8. If `triggers` non-empty: write detection log; if path matches `^/maze/[A-Za-z0-9._~-]{1,64}$` → `call_next`, else → `generate_maze_response(seed=BAIT_ID, ...)`
     9. Else: `call_next`
-  - [ ] **Test matrix in `test_detection_middleware.py` (one test per flow from design §4):**
-    - [ ] Non-flagged GET `/` (normal browser UA) → passes through, no detection log line, state records the request
-    - [ ] Flagged GET `/` with missing UA → 200 maze HTML at path `/`, detection log line with `triggers=["ua_missing"]`, access log line with `path="/"` — [design.md §4.2](./design.md#42-flagged-on-a-non-maze-path-serves-maze-inline)
-    - [ ] Flagged GET `/maze/a8f3` due to rate_exceeded (seed the state with 61 prior requests) → 200 maze HTML for seed `a8f3`, detection log line with `triggers=["rate_exceeded"]`, access log line with `path="/maze/a8f3"` — [design.md §4.3](./design.md#43-flagged-on-a-mazevalid-id-path-route-handles-it)
-    - [ ] GET `/robots.txt` with missing UA → passes through, body is exact v1 robots.txt bytes, **no** detection log line, **no** state mutation (verify by checking `len(store) == 0` after the request)
-    - [ ] Flagged GET `/maze/<invalid-id>` (e.g. `/maze/has%20space`) due to rate_exceeded → detection log line written **with `path="/maze/has%20space"`**, then 404 from v1's path-validation handler; **no** access log line (v1 only logs 200) — [design.md §6 "Flagged /maze/<invalid-id>"](./design.md#6-risks--edge-cases)
-    - [ ] Multi-signal trip: request with missing UA + prior maze visit + rate exceeded → `triggers=["ua_missing", "rate_exceeded", "prior_maze_visit"]` in exact order
-    - [ ] Flagged seed selection: when path is `/` and client is flagged, `generate_maze_response` is called with `seed=BAIT_ID` (`"root"`) — verified by checking that the returned body is identical to `GET /maze/root` output for the same chain
-    - [ ] 2–5s delay applies on the non-maze flagged path too (REQ-RESP-05); tests set `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0` to run fast
-  - [ ] **Kill-switch tests in `test_detection_switch.py`:**
-    - [ ] With `TARPIT_DETECTION_ENABLED=false`, a GET `/` with missing UA (would normally trip `ua_missing`) returns v1 content (contains the bait anchor), no detection log line, `len(store) == 0` (state untouched) — REQ-SWITCH-01, REQ-SWITCH-02
-    - [ ] With `TARPIT_DETECTION_ENABLED=false`, `GET /maze/root` runs the normal maze handler (access log written, 2–5s delay applied)
-  - [ ] Tests construct a minimal FastAPI app in-file, call `register_detection_middleware(app)`, and inject singletons via `app.state.*` — they do **not** import `tarpit.main.app`
-  - [ ] Middleware does **not** import from `tarpit.dependencies` — reviewer MUST flag any such import as FAIL
+  - [x] **Test matrix in `test_detection_middleware.py` (one test per flow from design §4):**
+    - [x] Non-flagged GET `/` (normal browser UA) → passes through, no detection log line, state records the request
+    - [x] Flagged GET `/` with missing UA → 200 maze HTML at path `/`, detection log line with `triggers=["ua_missing"]`, access log line with `path="/"` — [design.md §4.2](./design.md#42-flagged-on-a-non-maze-path-serves-maze-inline)
+    - [x] Flagged GET `/maze/a8f3` due to rate_exceeded (seed the state with 61 prior requests) → 200 maze HTML for seed `a8f3`, detection log line with `triggers=["rate_exceeded"]`, access log line with `path="/maze/a8f3"` — [design.md §4.3](./design.md#43-flagged-on-a-mazevalid-id-path-route-handles-it)
+    - [x] GET `/robots.txt` with missing UA → passes through, body is exact v1 robots.txt bytes, **no** detection log line, **no** state mutation (verify by checking `len(store) == 0` after the request)
+    - [x] Flagged GET `/maze/<invalid-id>` (e.g. `/maze/has%20space`) due to rate_exceeded → detection log line written **with `path="/maze/has%20space"`**, then 404 from v1's path-validation handler; **no** access log line (v1 only logs 200) — [design.md §6 "Flagged /maze/<invalid-id>"](./design.md#6-risks--edge-cases)
+    - [x] Multi-signal trip: request with missing UA + prior maze visit + rate exceeded → `triggers=["ua_missing", "rate_exceeded", "prior_maze_visit"]` in exact order
+    - [x] Flagged seed selection: when path is `/` and client is flagged, `generate_maze_response` is called with `seed=BAIT_ID` (`"root"`) — verified by checking that the returned body is identical to `GET /maze/root` output for the same chain
+    - [x] 2–5s delay applies on the non-maze flagged path too (REQ-RESP-05); tests set `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0` to run fast
+  - [x] **Kill-switch tests in `test_detection_switch.py`:**
+    - [x] With `TARPIT_DETECTION_ENABLED=false`, a GET `/` with missing UA (would normally trip `ua_missing`) returns v1 content (contains the bait anchor), no detection log line, `len(store) == 0` (state untouched) — REQ-SWITCH-01, REQ-SWITCH-02
+    - [x] With `TARPIT_DETECTION_ENABLED=false`, `GET /maze/root` runs the normal maze handler (access log written, 2–5s delay applied)
+  - [x] Tests construct a minimal FastAPI app in-file, call `register_detection_middleware(app)`, and inject singletons via `app.state.*` — they do **not** import `tarpit.main.app`
+  - [x] Middleware does **not** import from `tarpit.dependencies` — reviewer MUST flag any such import as FAIL
 - **Notes:** The single largest surface in v2.1. Builds the mini test app via a helper (one `make_app()` function inside each test file), mirrors how v1 `test_root.py` / `test_maze.py` are structured. For the "flagged seed selection" test: assert the response body equals the body of a direct call to `generate_maze_response(seed="root", ...)` with the same `rng` seeding — bit-for-bit equality.
 
 ---
