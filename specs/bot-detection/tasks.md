@@ -37,18 +37,18 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `state.py`](./design.md#srctarpitdetectionstatepy) exactly: `class DetectionStateStore` with `__init__(max_entries, window_seconds, rate_budget)`, `record_request(ip, now)`, `is_rate_exceeded(ip, now)`, `has_prior_maze_visit(ip)`, `mark_maze_visit(ip)`, `__len__`
-  - [ ] `record_request` prunes timestamps older than `now - window_seconds` from the per-IP deque **before** appending `now`
-  - [ ] `record_request` moves the IP to most-recently-used in the LRU on every call
-  - [ ] `record_request` on a new IP when `len(store) == max_entries` evicts exactly one least-recently-used entry **before** inserting (so `len(store) <= max_entries` always holds) — REQ-STATE-03, REQ-SEC-01
-  - [ ] `is_rate_exceeded` returns `True` iff the pruned deque length is **strictly greater** than `rate_budget` (budget-count ties do NOT trip) — [design.md §6 "Rate window boundary"](./design.md#6-risks--edge-cases)
-  - [ ] `is_rate_exceeded` returns `False` for an unknown IP
-  - [ ] `has_prior_maze_visit` returns `False` for an unknown IP; returns `True` only after `mark_maze_visit` has been called for that IP
-  - [ ] `__len__` returns the current entry count
-  - [ ] **Determinism test**: `record_request` + eviction order is deterministic across runs for the same input sequence
-  - [ ] **Boundary test**: insert exactly `max_entries` IPs, then one more → `__len__ == max_entries`, the first IP inserted is evicted, the second-inserted IP is still present
-  - [ ] **Pruning test**: a deque with 100 timestamps spanning 120 seconds, queried at `now = 120`, with `window_seconds = 60` → pruned to only entries from `[60, 120]`
-  - [ ] No thread/async locks; no `threading.Lock` or `asyncio.Lock` in state.py — single-worker invariant from design §5 — reviewer MUST flag any lock import as FAIL
+  - [x] Public surface matches [design.md §2.2 `state.py`](./design.md#srctarpitdetectionstatepy) exactly: `class DetectionStateStore` with `__init__(max_entries, window_seconds, rate_budget)`, `record_request(ip, now)`, `is_rate_exceeded(ip, now)`, `has_prior_maze_visit(ip)`, `mark_maze_visit(ip)`, `__len__`
+  - [x] `record_request` prunes timestamps older than `now - window_seconds` from the per-IP deque **before** appending `now`
+  - [x] `record_request` moves the IP to most-recently-used in the LRU on every call
+  - [x] `record_request` on a new IP when `len(store) == max_entries` evicts exactly one least-recently-used entry **before** inserting (so `len(store) <= max_entries` always holds) — REQ-STATE-03, REQ-SEC-01
+  - [x] `is_rate_exceeded` returns `True` iff the pruned deque length is **strictly greater** than `rate_budget` (budget-count ties do NOT trip) — [design.md §6 "Rate window boundary"](./design.md#6-risks--edge-cases)
+  - [x] `is_rate_exceeded` returns `False` for an unknown IP
+  - [x] `has_prior_maze_visit` returns `False` for an unknown IP; returns `True` only after `mark_maze_visit` has been called for that IP
+  - [x] `__len__` returns the current entry count
+  - [x] **Determinism test**: `record_request` + eviction order is deterministic across runs for the same input sequence
+  - [x] **Boundary test**: insert exactly `max_entries` IPs, then one more → `__len__ == max_entries`, the first IP inserted is evicted, the second-inserted IP is still present
+  - [x] **Pruning test**: a deque with 100 timestamps spanning 120 seconds, queried at `now = 120`, with `window_seconds = 60` → pruned to only entries from `[60, 120]`
+  - [x] No thread/async locks; no `threading.Lock` or `asyncio.Lock` in state.py — single-worker invariant from design §5 — reviewer MUST flag any lock import as FAIL
 - **Notes:** Satisfies REQ-STATE-01 (in-memory), REQ-STATE-02 (process-lifetime discard — implicit, no persistence code), REQ-STATE-03 (LRU bound), REQ-SEC-01 (eviction behavior). Uses `collections.OrderedDict` + `collections.deque` only — no new dependencies. `time` is passed in by the caller as `now`, not read inside this module, so tests use fixed timestamps.
 
 ---
@@ -61,14 +61,14 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] Public surface matches [design.md §2.2 `log.py`](./design.md#srctarpitdetectionlogpy) exactly: `@dataclass(frozen=True) DetectionRecord` with fields `ts: str`, `ip: str`, `ua: str | None`, `path: str`, `triggers: list[str]`; `class DetectionLogWriter` with `__init__(file, lock)` and `async append(record)`
-  - [ ] Written JSON line matches [design.md §2.3 schema](./design.md#23-detection-log-json-schema-v21): key order exactly `ts, ip, ua, path, triggers`; one line, newline-terminated
-  - [ ] `ua=None` serialises as JSON `null`
-  - [ ] `triggers=["ua_missing", "rate_exceeded"]` serialises as a JSON array in that order
-  - [ ] `append` runs the blocking write + flush via `asyncio.to_thread` under the lock
-  - [ ] **Concurrent-append test**: fire 20 `append` calls on the same writer with `asyncio.gather`; file has exactly 20 lines, every line parses as JSON, no interleaved bytes — mirrors v1 `AccessLogWriter` concurrency test
-  - [ ] `DetectionRecord` is frozen (mutation attempt raises `FrozenInstanceError`)
-  - [ ] Writing a record with an empty `triggers` list is **not** forbidden at the API level (serialises as `[]`) — but middleware never does this (REQ-DLOG-02); documented as "API allows, caller discipline required"
+  - [x] Public surface matches [design.md §2.2 `log.py`](./design.md#srctarpitdetectionlogpy) exactly: `@dataclass(frozen=True) DetectionRecord` with fields `ts: str`, `ip: str`, `ua: str | None`, `path: str`, `triggers: list[str]`; `class DetectionLogWriter` with `__init__(file, lock)` and `async append(record)`
+  - [x] Written JSON line matches [design.md §2.3 schema](./design.md#23-detection-log-json-schema-v21): key order exactly `ts, ip, ua, path, triggers`; one line, newline-terminated
+  - [x] `ua=None` serialises as JSON `null`
+  - [x] `triggers=["ua_missing", "rate_exceeded"]` serialises as a JSON array in that order
+  - [x] `append` runs the blocking write + flush via `asyncio.to_thread` under the lock
+  - [x] **Concurrent-append test**: fire 20 `append` calls on the same writer with `asyncio.gather`; file has exactly 20 lines, every line parses as JSON, no interleaved bytes — mirrors v1 `AccessLogWriter` concurrency test
+  - [x] `DetectionRecord` is frozen (mutation attempt raises `FrozenInstanceError`)
+  - [x] Writing a record with an empty `triggers` list is **not** forbidden at the API level (serialises as `[]`) — but middleware never does this (REQ-DLOG-02); documented as "API allows, caller discipline required"
 - **Notes:** Satisfies REQ-DLOG-01, REQ-DLOG-04 (shape forbids extra fields by construction). Structurally parallel to v1 `AccessLogWriter`; reviewer may compare the two.
 
 ---
@@ -80,12 +80,12 @@
 - **Depends on:** T1
 - **Parallel group:** W2a
 - **Acceptance:**
-  - [ ] A new module-level `async def generate_maze_response(seed, chain, log_writer, settings, request)` function exists with the signature from [design.md §2.2 maze refactor](./design.md#srctarpitroutersmazepy--refactor-not-a-contract-change)
-  - [ ] The existing `GET /maze/{id}` route handler is reduced to a thin wrapper that calls `await generate_maze_response(id, chain, log_writer, settings, request)` and returns its result
-  - [ ] **v1 maze.py behavior is byte-identical**: `uv run pytest -q tests/test_maze.py` passes with **zero changes to `tests/test_maze.py`** — if the implementor modifies that test file, reviewer FAILs
-  - [ ] `generate_maze_response` is pure in the "no module-level state" sense — it takes all its collaborators as parameters, consistent with the design
-  - [ ] No change to any other v1 file (not `main.py`, not `renderer.py`, not `ids.py`, nothing else)
-  - [ ] `uv run pytest -q` is fully green after the refactor
+  - [x] A new module-level `async def generate_maze_response(seed, chain, log_writer, settings, request)` function exists with the signature from [design.md §2.2 maze refactor](./design.md#srctarpitroutersmazepy--refactor-not-a-contract-change)
+  - [x] The existing `GET /maze/{id}` route handler is reduced to a thin wrapper that calls `await generate_maze_response(id, chain, log_writer, settings, request)` and returns its result
+  - [x] **v1 maze.py behavior is byte-identical**: `uv run pytest -q tests/test_maze.py` passes with **zero changes to `tests/test_maze.py`** — if the implementor modifies that test file, reviewer FAILs
+  - [x] `generate_maze_response` is pure in the "no module-level state" sense — it takes all its collaborators as parameters, consistent with the design
+  - [x] No change to any other v1 file (not `main.py`, not `renderer.py`, not `ids.py`, nothing else)
+  - [x] `uv run pytest -q` is fully green after the refactor
 - **Notes:** This is a pure extraction — zero semantic change. The function body IS the current handler body minus the `Depends` boilerplate; the wrapper is 2 lines. If the refactor requires altering `tests/test_maze.py` to pass, something has gone wrong in the extraction — stop and surface it (do **not** edit the test).
 
 ---
