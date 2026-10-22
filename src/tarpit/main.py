@@ -8,6 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from tarpit.access_log import AccessLogWriter
+from tarpit.detection.log import DetectionLogWriter
+from tarpit.detection.middleware import register_detection_middleware
+from tarpit.detection.state import DetectionStateStore
 from tarpit.markov import MarkovChain
 from tarpit.routers import maze, root
 from tarpit.settings import get_settings
@@ -24,9 +27,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log_file = settings.log_path.open("a", encoding="utf-8")
     app.state.log_writer = AccessLogWriter(log_file, asyncio.Lock())
 
+    app.state.detection_store = DetectionStateStore(
+        max_entries=settings.detection_state_max_entries,
+        window_seconds=settings.detection_rate_window_s,
+        rate_budget=settings.detection_rate_budget,
+    )
+
+    settings.detection_log_path.parent.mkdir(parents=True, exist_ok=True)
+    detection_file = settings.detection_log_path.open("a", encoding="utf-8")
+    app.state.detection_log_writer = DetectionLogWriter(detection_file, asyncio.Lock())
+
     yield
 
     log_file.close()
+    detection_file.close()
 
 
 def create_app() -> FastAPI:
@@ -34,6 +48,8 @@ def create_app() -> FastAPI:
 
     app.include_router(root.router)
     app.include_router(maze.router)
+
+    register_detection_middleware(app)
 
     @app.exception_handler(RequestValidationError)
     async def path_validation_to_404(
