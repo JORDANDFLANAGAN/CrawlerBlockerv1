@@ -190,20 +190,20 @@
 - **Depends on:** T6, T7
 - **Parallel group:** W4 (serial — single task in wave)
 - **Acceptance:**
-  - [ ] `lifespan(app)` in `main.py` extends v1's lifespan to additionally:
+  - [x] `lifespan(app)` in `main.py` extends v1's lifespan to additionally:
     - Construct `app.state.detection_store = DetectionStateStore(max_entries=settings.detection_state_max_entries, window_seconds=settings.detection_rate_window_s, rate_budget=settings.detection_rate_budget)`
     - Create `settings.detection_log_path.parent` if missing
     - Open the detection log file in append mode (UTF-8) and construct `app.state.detection_log_writer = DetectionLogWriter(detection_file, asyncio.Lock())`
     - Close the detection log file on shutdown — symmetric with the v1 access log close
-  - [ ] `create_app()` calls `register_detection_middleware(app)` after both routers are included but before the `RequestValidationError` handler is registered (so the middleware wraps the router + handler chain)
-  - [ ] All v1 behavior in `main.py` preserved: `workers=1` still passed to `uvicorn.run`; v1 lifespan setup for `chain` and `log_writer` unchanged; `app = create_app()` module-level still exists; `__init__.py` exports unchanged
-  - [ ] **End-to-end tests in `test_detection_e2e.py`** (boots real uvicorn on ephemeral port, mirrors `test_e2e_smoke.py` style):
-    - [ ] Lifespan builds both state store and detection log writer: on startup, `app.state.detection_store` and `app.state.detection_log_writer` both exist and are of the correct types
-    - [ ] A real request to `/` with no `User-Agent` header receives 200 maze HTML at path `/`, `logs/detection.log` gains one line with `triggers=["ua_missing"]`, `logs/access.log` gains one line with `path="/"`
-    - [ ] A real request to `/robots.txt` with no `User-Agent` header receives the normal v1 robots.txt bytes, `logs/detection.log` is unchanged, `logs/access.log` is unchanged
-    - [ ] With `TARPIT_DETECTION_ENABLED=false`, a real request to `/` with no `User-Agent` header receives the v1 `/` content (contains the bait anchor), both logs unchanged
-    - [ ] Tests force `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0` and use `tmp_path`-based `TARPIT_LOG_PATH` / `TARPIT_DETECTION_LOG_PATH` so they do not pollute real log files
-  - [ ] After this task, `uv run pytest -q` is fully green including all v1 and v2.1 tests
+  - [x] `create_app()` calls `register_detection_middleware(app)` after both routers are included but before the `RequestValidationError` handler is registered (so the middleware wraps the router + handler chain)
+  - [x] All v1 behavior in `main.py` preserved: `workers=1` still passed to `uvicorn.run`; v1 lifespan setup for `chain` and `log_writer` unchanged; `app = create_app()` module-level still exists; `__init__.py` exports unchanged
+  - [x] **End-to-end tests in `test_detection_e2e.py`** (boots real uvicorn on ephemeral port, mirrors `test_e2e_smoke.py` style):
+    - [x] Lifespan builds both state store and detection log writer: on startup, `app.state.detection_store` and `app.state.detection_log_writer` both exist and are of the correct types
+    - [x] A real request to `/` with no `User-Agent` header receives 200 maze HTML at path `/`, `logs/detection.log` gains one line with `triggers=["ua_missing"]`, `logs/access.log` gains one line with `path="/"`
+    - [x] A real request to `/robots.txt` with no `User-Agent` header receives the normal v1 robots.txt bytes, `logs/detection.log` is unchanged, `logs/access.log` is unchanged
+    - [x] With `TARPIT_DETECTION_ENABLED=false`, a real request to `/` with no `User-Agent` header receives the v1 `/` content (contains the bait anchor), both logs unchanged
+    - [x] Tests force `TARPIT_DELAY_MIN_S=0 TARPIT_DELAY_MAX_S=0` and use `tmp_path`-based `TARPIT_LOG_PATH` / `TARPIT_DETECTION_LOG_PATH` so they do not pollute real log files
+  - [x] After this task, `uv run pytest -q` is fully green including all v1 and v2.1 tests
 - **Notes:** Final integration. The v1 e2e smoke test (`test_e2e_smoke.py`) is **not** modified — v2.1 adds its own e2e file. If the v1 e2e test flakes after wiring (e.g. because detection now sits in front of its requests), investigate; most likely root cause is the test's requests tripping `prior_maze_visit` on sequential `/maze/*` calls, which still produces valid responses but adds a detection log line. If detection must be disabled for v1 e2e to isolate, that's a separate follow-up — surface it to the user, don't modify `test_e2e_smoke.py` silently.
 
 ---
