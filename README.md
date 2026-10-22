@@ -102,3 +102,66 @@ time curl -s http://localhost:8000/maze/a8f3 > /dev/null
 ```sh
 tail -5 logs/access.log | python3 -c "import sys, json; [json.loads(l) for l in sys.stdin]; print('All lines valid JSON')"
 ```
+
+---
+
+## Detection (v2.1)
+
+v2.1 adds a detection layer that routes suspicious clients into the maze automatically — without needing them to follow the hidden bait link.
+
+### Kill switch
+
+`TARPIT_DETECTION_ENABLED` (default `true`) controls the entire detection subsystem. Set it to `false` for incident recovery without a code change:
+
+```sh
+TARPIT_DETECTION_ENABLED=false uv run tarpit
+```
+
+When `false`: every request is routed to its normal handler unchanged. No detection log is written. No per-IP state is updated. The v1 bait anchor on `/` remains in place.
+
+### Detection settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TARPIT_DETECTION_ENABLED` | `true` | Master kill switch for all detection |
+| `TARPIT_DETECTION_LOG_PATH` | `logs/detection.log` | Path for the detection event log |
+| `TARPIT_DETECTION_RATE_BUDGET` | `60` | Max requests per IP per window before flagging |
+| `TARPIT_DETECTION_RATE_WINDOW_S` | `60.0` | Sliding window length in seconds |
+| `TARPIT_DETECTION_STATE_MAX_ENTRIES` | `10000` | LRU cap on per-IP state table (entries) |
+
+### Detection signals
+
+A request is flagged if **any** of these signals fires:
+
+| Signal id | Condition |
+|-----------|-----------|
+| `ua_missing` | `User-Agent` header is absent or empty |
+| `ua_known_bot_pattern` | UA (case-insensitive) contains `bot`, `crawler`, or `spider` |
+| `rate_exceeded` | Source IP made more than `TARPIT_DETECTION_RATE_BUDGET` requests in the last `TARPIT_DETECTION_RATE_WINDOW_S` seconds |
+| `prior_maze_visit` | Source IP previously requested any `/maze/*` path in this process lifetime |
+
+Flagged requests on non-maze paths (e.g. `/`) receive maze content at the requested path (HTTP 200, no redirect). Flagged requests on valid `/maze/{id}` paths are forwarded to the normal maze handler.
+
+### Detection log
+
+Flagged requests are logged to `logs/detection.log` (one JSON object per line). The log is written only when a request is actually routed into the maze — non-flagged traffic is never logged here.
+
+Schema (see also [design.md §2.3](specs/bot-detection/design.md)):
+
+```json
+{"ts": "2026-10-21T12:40:00Z", "ip": "203.0.113.7", "ua": null, "path": "/", "triggers": ["ua_missing"]}
+```
+
+Fields: `ts` (ISO-8601 UTC), `ip`, `ua` (or `null`), `path`, `triggers` (list of signal ids).
+
+### Monitoring both logs
+
+```sh
+tail -F logs/access.log logs/detection.log
+```
+
+### Single-worker requirement
+
+**Detection state is per-process and in-memory.** `main.py` enforces `workers=1` in its uvicorn call. Raising `--workers` above 1 would give each worker its own isolated state table, defeating detection entirely — a bot rotating between workers would trip neither. **Do not change `workers=1` in v2.x.**
+
+This constraint will be revisited when detection state is externalized (a v3+ concern).
