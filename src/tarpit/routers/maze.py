@@ -20,22 +20,30 @@ router = APIRouter()
 WORDS_PER_PAGE = 200
 
 
-@router.get("/maze/{id}")
-async def get_maze_page(
+async def generate_maze_response(
+    seed: str,
+    chain: MarkovChain,
+    log_writer: AccessLogWriter,
+    settings: Settings,
     request: Request,
-    id: str = Path(..., pattern=r"^[A-Za-z0-9._~-]{1,64}$"),
-    chain: MarkovChain = Depends(get_chain),
-    log_writer: AccessLogWriter = Depends(get_log_writer),
-    settings: Settings = Depends(get_settings_dep),
 ) -> HTMLResponse:
+    """Produce a complete `/maze/*` response for the given `seed`:
+    generate ~200 words, 5–10 outgoing hex links, HTML-render, delay
+    2–5s, append to access.log, return 200 HTMLResponse.
+
+    This is the exact behavior v1 maze.py already implements; the
+    extraction only moves the body into a named function so the v2.1
+    middleware can call it with `seed=BAIT_ID`.
+
+    External behavior of `GET /maze/{id}` is unchanged."""
     try:
-        rng = random.Random(id)
+        rng = random.Random(seed)
         words = chain.generate(rng, WORDS_PER_PAGE)
         k = rng.randint(5, 10)
         new_ids = generate_new_ids(rng, k)
-        html = render_maze_page(id, words, new_ids)
+        html = render_maze_page(seed, words, new_ids)
     except Exception as exc:
-        logger.error("Generation failed for id=%r: %s", id, exc, exc_info=True)
+        logger.error("Generation failed for id=%r: %s", seed, exc, exc_info=True)
         return PlainTextResponse("internal error", status_code=500)
 
     delay = random.uniform(settings.delay_min_s, settings.delay_max_s)
@@ -55,3 +63,14 @@ async def get_maze_page(
     await log_writer.append(record)
 
     return HTMLResponse(html)
+
+
+@router.get("/maze/{id}")
+async def get_maze_page(
+    request: Request,
+    id: str = Path(..., pattern=r"^[A-Za-z0-9._~-]{1,64}$"),
+    chain: MarkovChain = Depends(get_chain),
+    log_writer: AccessLogWriter = Depends(get_log_writer),
+    settings: Settings = Depends(get_settings_dep),
+) -> HTMLResponse:
+    return await generate_maze_response(id, chain, log_writer, settings, request)
