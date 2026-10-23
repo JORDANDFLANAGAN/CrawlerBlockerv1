@@ -66,11 +66,11 @@
 - **Depends on:** T2, T3, T4, T5
 - **Parallel group:** B
 - **Acceptance:**
-  - [ ] `register_abuse_middleware(app: FastAPI) -> None` installs an HTTP middleware whose behaviour follows the nine-step sequence in [design.md §2.5](./design.md#25-middleware--srctarpitabusemiddlewarepy) exactly: kill-switch pass-through, `/robots.txt` pass-through, scope check (`/` or `/maze/*`), `record_request`, then per-IP rate → global rate → `try_acquire_slot` in that order, 429 on breach with log + `flag_for_detection` call, otherwise `try/finally` around `call_next` to guarantee `release_slot`.
-  - [ ] 429 response has status 429, empty body, `Content-Type: text/plain; charset=utf-8`, `Content-Length: 0`, no `Retry-After` ([design.md §2.7](./design.md#27-response-shape)).
-  - [ ] `flag_for_detection` call is skipped when `settings.detection_enabled` is `False` (REQ-SIG-04).
-  - [ ] Middleware reads settings via the same `app.state.settings` → `get_settings()` fallback pattern used in `detection/middleware.py`.
-  - [ ] Tests (middleware-level, using `TestClient` with injected store/writer on `app.state`) cover: per-IP rate 429, global rate 429, per-IP concurrency 429, global concurrency 429, `/robots.txt` always allowed, out-of-scope path allowed, kill-switch off bypasses everything, 429 writes exactly one line to the abuse log with the correct `reason`, 429 calls `flag_for_detection` on the detection store, kill-switched detection suppresses the signal.
+  - [x] `register_abuse_middleware(app: FastAPI) -> None` installs an HTTP middleware whose behaviour follows the nine-step sequence in [design.md §2.5](./design.md#25-middleware--srctarpitabusemiddlewarepy) exactly: kill-switch pass-through, `/robots.txt` pass-through, scope check (`/` or `/maze/*`), `record_request`, then per-IP rate → global rate → `try_acquire_slot` in that order, 429 on breach with log + `flag_for_detection` call, otherwise `try/finally` around `call_next` to guarantee `release_slot`.
+  - [x] 429 response has status 429, empty body, `Content-Type: text/plain; charset=utf-8`, `Content-Length: 0`, no `Retry-After` ([design.md §2.7](./design.md#27-response-shape)).
+  - [x] `flag_for_detection` call is skipped when `settings.detection_enabled` is `False` (REQ-SIG-04).
+  - [x] Middleware reads settings via the same `app.state.settings` → `get_settings()` fallback pattern used in `detection/middleware.py`.
+  - [x] Tests (middleware-level, using `TestClient` with injected store/writer on `app.state`) cover: per-IP rate 429, global rate 429, per-IP concurrency 429, global concurrency 429, `/robots.txt` always allowed, out-of-scope path allowed, kill-switch off bypasses everything, 429 writes exactly one line to the abuse log with the correct `reason`, 429 calls `flag_for_detection` on the detection store, kill-switched detection suppresses the signal.
 - **Notes:** Do NOT touch `main.py` here — T7 wires it. Build the test fixtures so they stand up a minimal `FastAPI()` app with just this middleware and a dummy `/maze/{x}` + `/` + `/robots.txt` route; no need to boot `create_app()`.
 
 ## T7 — Lifespan wiring in main.py
