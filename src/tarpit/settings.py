@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     detection_rate_window_s: float = 60.0
     detection_state_max_entries: int = 10_000
 
+    abuse_protection_enabled: bool = True
+    abuse_log_path: Path = Path("logs/abuse.log")
+
+    rl_per_ip_budget: int = 120
+    rl_per_ip_window_s: float = 60.0
+    rl_state_max_entries: int = 10_000
+
+    cc_per_ip_max: int = 10
+
+    gl_inflight_max: int = 500
+    gl_rate_budget: int = 1_000
+    gl_window_s: float = 60.0
+
 
 @functools.lru_cache
 def get_settings() -> Settings:
