@@ -78,9 +78,9 @@
 - **Depends on:** T1, T4, T5, T6
 - **Parallel group:** —
 - **Acceptance:**
-  - [ ] `lifespan` constructs `AbuseStateStore` with every kwarg mapped from settings per [design.md §2.8](./design.md#28-lifespan-wiring--srctarpitmainpy), opens `logs/abuse.log` (parent `mkdir(parents=True, exist_ok=True)`), and attaches `app.state.abuse_store` and `app.state.abuse_log_writer`. File is closed in shutdown.
-  - [ ] `create_app()` calls `register_detection_middleware(app)` *before* `register_abuse_middleware(app)` so abuse runs first at request time (FastAPI reverses order).
-  - [ ] `uv run pytest -q` still green with no abuse-protection-specific tests disabled; existing detection e2e tests still pass unchanged.
+  - [x] `lifespan` constructs `AbuseStateStore` with every kwarg mapped from settings per [design.md §2.8](./design.md#28-lifespan-wiring--srctarpitmainpy), opens `logs/abuse.log` (parent `mkdir(parents=True, exist_ok=True)`), and attaches `app.state.abuse_store` and `app.state.abuse_log_writer`. File is closed in shutdown.
+  - [x] `create_app()` calls `register_detection_middleware(app)` *before* `register_abuse_middleware(app)` so abuse runs first at request time (FastAPI reverses order).
+  - [x] `uv run pytest -q` still green with no abuse-protection-specific tests disabled; existing detection e2e tests still pass unchanged.
 - **Notes:** Single-file task so no one else needs to edit `main.py` in parallel. If a test currently inspects `app.state` fields, add the new fields rather than renaming existing ones.
 
 ## T8 — E2E + middleware-ordering tests
