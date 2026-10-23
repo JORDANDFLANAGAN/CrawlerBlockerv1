@@ -8,6 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from tarpit.access_log import AccessLogWriter
+from tarpit.abuse.log import AbuseLogWriter
+from tarpit.abuse.middleware import register_abuse_middleware
+from tarpit.abuse.state import AbuseStateStore
 from tarpit.detection.log import DetectionLogWriter
 from tarpit.detection.middleware import register_detection_middleware
 from tarpit.detection.state import DetectionStateStore
@@ -37,10 +40,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     detection_file = settings.detection_log_path.open("a", encoding="utf-8")
     app.state.detection_log_writer = DetectionLogWriter(detection_file, asyncio.Lock())
 
+    app.state.abuse_store = AbuseStateStore(
+        per_ip_window_s=settings.rl_per_ip_window_s,
+        per_ip_budget=settings.rl_per_ip_budget,
+        per_ip_concurrency_max=settings.cc_per_ip_max,
+        per_ip_state_max_entries=settings.rl_state_max_entries,
+        global_window_s=settings.gl_window_s,
+        global_rate_budget=settings.gl_rate_budget,
+        global_inflight_max=settings.gl_inflight_max,
+    )
+    settings.abuse_log_path.parent.mkdir(parents=True, exist_ok=True)
+    abuse_file = settings.abuse_log_path.open("a", encoding="utf-8")
+    app.state.abuse_log_writer = AbuseLogWriter(abuse_file, asyncio.Lock())
+
     yield
 
     log_file.close()
     detection_file.close()
+    abuse_file.close()
 
 
 def create_app() -> FastAPI:
@@ -49,7 +66,8 @@ def create_app() -> FastAPI:
     app.include_router(root.router)
     app.include_router(maze.router)
 
-    register_detection_middleware(app)
+    register_detection_middleware(app)   # registered first → runs second
+    register_abuse_middleware(app)       # registered second → runs first
 
     @app.exception_handler(RequestValidationError)
     async def path_validation_to_404(
