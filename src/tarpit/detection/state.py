@@ -66,6 +66,25 @@ class DetectionStateStore:
         if ip in self._entries:
             self._entries[ip].has_visited_maze = True
 
+    def flag_for_detection(self, ip: str, now: float) -> None:
+        """Called by abuse protection on 429. Ensures a record exists for
+        `ip` (creates if needed, touches LRU, applies the same eviction rule
+        as record_request) and sets has_visited_maze = True so the next
+        request from this IP trips the prior_maze_visit signal in
+        detection.signals.evaluate_request."""
+        if ip in self._entries:
+            record = self._entries[ip]
+            self._entries.move_to_end(ip)
+        else:
+            record = _IPRecord()
+            self._entries[ip] = record
+
+        record.last_seen = now
+        record.has_visited_maze = True
+
+        if len(self._entries) > self._max_entries:
+            self._entries.popitem(last=False)
+
     def __len__(self) -> int:
         """Current entry count. For observability and testing."""
         return len(self._entries)
