@@ -14,10 +14,10 @@
 - **Depends on:** —
 - **Parallel group:** A
 - **Acceptance:**
-  - [ ] All eight fields from [design.md §2.1](./design.md#21-settings--additions-to-srctarpitsettingspy) added to `Settings`: `abuse_protection_enabled`, `abuse_log_path`, `rl_per_ip_budget`, `rl_per_ip_window_s`, `rl_state_max_entries`, `cc_per_ip_max`, `gl_inflight_max`, `gl_rate_budget`, `gl_window_s` with the exact defaults listed.
-  - [ ] Field names and types match the design (so env vars resolve as `TARPIT_ABUSE_PROTECTION_ENABLED`, `TARPIT_RL_PER_IP_BUDGET`, etc.).
-  - [ ] Existing fields and defaults untouched.
-  - [ ] `uv run pytest -q` still green.
+  - [x] All eight fields from [design.md §2.1](./design.md#21-settings--additions-to-srctarpitsettingspy) added to `Settings`: `abuse_protection_enabled`, `abuse_log_path`, `rl_per_ip_budget`, `rl_per_ip_window_s`, `rl_state_max_entries`, `cc_per_ip_max`, `gl_inflight_max`, `gl_rate_budget`, `gl_window_s` with the exact defaults listed.
+  - [x] Field names and types match the design (so env vars resolve as `TARPIT_ABUSE_PROTECTION_ENABLED`, `TARPIT_RL_PER_IP_BUDGET`, etc.).
+  - [x] Existing fields and defaults untouched.
+  - [x] `uv run pytest -q` still green.
 - **Notes:** No validators. CLAUDE.md: trust internal code at this boundary. Verifies REQ-SWITCH-01, REQ-RL-03/04, REQ-CC-02, REQ-GL-02/03, REQ-LOG-01.
 
 ## T2 — Abuse package skeleton + reason constants
@@ -25,8 +25,8 @@
 - **Depends on:** —
 - **Parallel group:** A
 - **Acceptance:**
-  - [ ] Package directory `src/tarpit/abuse/` exists with an empty `__init__.py` (mirroring `src/tarpit/detection/__init__.py`).
-  - [ ] `reasons.py` exports exactly the four `REASON_*: Final[str]` constants from [design.md §2.2](./design.md#22-reason-constants--srctarpitabusereasonspy) with the literal string values pinned by REQ-LOG-02.
+  - [x] Package directory `src/tarpit/abuse/` exists with an empty `__init__.py` (mirroring `src/tarpit/detection/__init__.py`).
+  - [x] `reasons.py` exports exactly the four `REASON_*: Final[str]` constants from [design.md §2.2](./design.md#22-reason-constants--srctarpitabusereasonspy) with the literal string values pinned by REQ-LOG-02.
 - **Notes:** Trivially small, intentionally separate so downstream tasks (T4, T5, T6) can import constants without waiting on the store or writer.
 
 ## T3 — Detection signal entry point
@@ -34,9 +34,9 @@
 - **Depends on:** —
 - **Parallel group:** A
 - **Acceptance:**
-  - [ ] `DetectionStateStore.flag_for_detection(ip: str, now: float) -> None` added per [design.md §2.6](./design.md#26-signal-to-detection--new-method-on-detectionstatestore). Creates the record if absent, touches LRU, applies the same eviction rule as `record_request`, sets `has_visited_maze = True`.
-  - [ ] New test(s) in `tests/test_detection_state.py` cover: unknown-IP creates record; known-IP flips the flag; LRU eviction fires when the new record pushes size over `max_entries`.
-  - [ ] All existing `DetectionStateStore` tests still pass.
+  - [x] `DetectionStateStore.flag_for_detection(ip: str, now: float) -> None` added per [design.md §2.6](./design.md#26-signal-to-detection--new-method-on-detectionstatestore). Creates the record if absent, touches LRU, applies the same eviction rule as `record_request`, sets `has_visited_maze = True`.
+  - [x] New test(s) in `tests/test_detection_state.py` cover: unknown-IP creates record; known-IP flips the flag; LRU eviction fires when the new record pushes size over `max_entries`.
+  - [x] All existing `DetectionStateStore` tests still pass.
 - **Notes:** Keep the method signature exactly as frozen in design — T6 imports it. Do NOT modify `record_request`, `is_rate_exceeded`, `has_prior_maze_visit`, or `mark_maze_visit`.
 
 ## T4 — AbuseStateStore
@@ -44,11 +44,11 @@
 - **Depends on:** —
 - **Parallel group:** A
 - **Acceptance:**
-  - [ ] `AbuseStateStore` class with the exact `__init__` kwargs and public methods from [design.md §2.3](./design.md#23-abusestatestore--srctarpitabusestatepy): `record_request`, `is_per_ip_rate_exceeded`, `is_global_rate_exceeded`, `try_acquire_slot`, `release_slot`, `per_ip_inflight`, `global_inflight`, `__len__`.
-  - [ ] `try_acquire_slot` returns `None` on success; on failure returns `REASON_PER_IP_CONCURRENCY` *before* `REASON_GLOBAL_INFLIGHT` (check order fixed by design).
-  - [ ] `release_slot` clamps per-IP decrement at 0 and decrements global unconditionally (handles the LRU-eviction race called out in [design.md §6](./design.md#6-risks--edge-cases)).
-  - [ ] `record_request` updates both the per-IP deque and the global deque in one call; prunes both using their respective window settings; evicts LRU on overflow.
-  - [ ] Tests cover: fresh-IP record creation, sliding-window prune, per-IP rate threshold (strict `>` budget), global rate threshold, concurrency acquire/release pairing, concurrency ordering (per-IP blocks before global), LRU eviction, and the eviction-mid-flight race (acquire, force eviction via N other IPs, release still works).
+  - [x] `AbuseStateStore` class with the exact `__init__` kwargs and public methods from [design.md §2.3](./design.md#23-abusestatestore--srctarpitabusestatepy): `record_request`, `is_per_ip_rate_exceeded`, `is_global_rate_exceeded`, `try_acquire_slot`, `release_slot`, `per_ip_inflight`, `global_inflight`, `__len__`.
+  - [x] `try_acquire_slot` returns `None` on success; on failure returns `REASON_PER_IP_CONCURRENCY` *before* `REASON_GLOBAL_INFLIGHT` (check order fixed by design).
+  - [x] `release_slot` clamps per-IP decrement at 0 and decrements global unconditionally (handles the LRU-eviction race called out in [design.md §6](./design.md#6-risks--edge-cases)).
+  - [x] `record_request` updates both the per-IP deque and the global deque in one call; prunes both using their respective window settings; evicts LRU on overflow.
+  - [x] Tests cover: fresh-IP record creation, sliding-window prune, per-IP rate threshold (strict `>` budget), global rate threshold, concurrency acquire/release pairing, concurrency ordering (per-IP blocks before global), LRU eviction, and the eviction-mid-flight race (acquire, force eviction via N other IPs, release still works).
 - **Notes:** No locks, no `await`. Mirror the `DetectionStateStore` style (`OrderedDict`, `deque`, synchronous methods). Import the reason constants from `tarpit.abuse.reasons` — introduces a soft dependency on T2 if T2 lands first, otherwise stub-import later. If T2 isn't ready at implementation start, inline-define the two needed constants temporarily and swap imports after T2.
 
 ## T5 — AbuseLogWriter + AbuseRecord
@@ -56,9 +56,9 @@
 - **Depends on:** —
 - **Parallel group:** A
 - **Acceptance:**
-  - [ ] `AbuseRecord` frozen dataclass with field order `ts, ip, ua, path, reason` matching [design.md §2.4](./design.md#24-log-record--writer--srctarpitabuselogpy).
-  - [ ] `AbuseLogWriter.append` writes one JSON line, newline-terminated, key order `ts, ip, ua, path, reason`, flushed; blocking IO goes through `asyncio.to_thread` under the writer's `asyncio.Lock`.
-  - [ ] Tests assert: single-line JSON output; key order; concurrent `append` calls from two tasks produce two complete, non-interleaved lines; `ua=None` serialises to JSON `null`.
+  - [x] `AbuseRecord` frozen dataclass with field order `ts, ip, ua, path, reason` matching [design.md §2.4](./design.md#24-log-record--writer--srctarpitabuselogpy).
+  - [x] `AbuseLogWriter.append` writes one JSON line, newline-terminated, key order `ts, ip, ua, path, reason`, flushed; blocking IO goes through `asyncio.to_thread` under the writer's `asyncio.Lock`.
+  - [x] Tests assert: single-line JSON output; key order; concurrent `append` calls from two tasks produce two complete, non-interleaved lines; `ua=None` serialises to JSON `null`.
 - **Notes:** Mirror `DetectionLogWriter` structurally. Verifies REQ-LOG-01..04.
 
 ## T6 — Abuse middleware
