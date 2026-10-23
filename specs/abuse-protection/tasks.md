@@ -88,9 +88,9 @@
 - **Depends on:** T7
 - **Parallel group:** C
 - **Acceptance:**
-  - [ ] E2E test boots the real `create_app()` (via the existing TestClient pattern) and exercises: baseline 200 under limits; sustained requests from one IP eventually produce 429 with empty body on both `/` and `/maze/{id}`; `GET /robots.txt` is never 429'd even when caps are tripped; a 429 appends a line to `logs/abuse.log` with the correct keys and reason.
-  - [ ] Ordering test confirms abuse runs before detection: configure thresholds so abuse would 429 but detection *would* flag with maze content; assert the response is 429 (empty body), and that `logs/detection.log` did NOT receive a line for that request. After relaxing abuse thresholds (next request), confirm detection then fires on `prior_maze_visit` because `flag_for_detection` was called on the earlier 429.
-  - [ ] Tests use temporary log paths via settings override; do not write under the repo's real `logs/` directory.
+  - [x] E2E test boots the real `create_app()` (via the existing TestClient pattern) and exercises: baseline 200 under limits; sustained requests from one IP eventually produce 429 with empty body on both `/` and `/maze/{id}`; `GET /robots.txt` is never 429'd even when caps are tripped; a 429 appends a line to `logs/abuse.log` with the correct keys and reason.
+  - [x] Ordering test confirms abuse runs before detection: configure thresholds so abuse would 429 but detection *would* flag with maze content; assert the response is 429 (empty body), and that `logs/detection.log` did NOT receive a line for that request. After relaxing abuse thresholds (next request), confirm detection then fires on `prior_maze_visit` because `flag_for_detection` was called on the earlier 429.
+  - [x] Tests use temporary log paths via settings override; do not write under the repo's real `logs/` directory.
 - **Notes:** Verifies REQ-SCOPE-01/02/03, REQ-SIG-01, REQ-GL-04, REQ-RESP-01/02/03. Use `pytest` fixtures (not mocks) per CLAUDE.md.
 
 ## T9 — Kill-switch test
@@ -98,9 +98,9 @@
 - **Depends on:** T7
 - **Parallel group:** C
 - **Acceptance:**
-  - [ ] With `TARPIT_ABUSE_PROTECTION_ENABLED=false`: a client exceeding every documented threshold still receives 200 and `logs/abuse.log` remains empty for the duration of the test.
-  - [ ] With abuse disabled, detection still fires normally (REQ-SWITCH-02): assert a `rate_exceeded`-flagged request produces a `logs/detection.log` line.
-  - [ ] With `TARPIT_DETECTION_ENABLED=false` but abuse enabled: 429s still happen, `logs/abuse.log` still receives lines, and no call to `flag_for_detection` leaks state (verify by sending a slow-paced follow-up request from the same IP and asserting it is NOT flagged with `prior_maze_visit`).
+  - [x] With `TARPIT_ABUSE_PROTECTION_ENABLED=false`: a client exceeding every documented threshold still receives 200 and `logs/abuse.log` remains empty for the duration of the test.
+  - [x] With abuse disabled, detection still fires normally (REQ-SWITCH-02): assert a `rate_exceeded`-flagged request produces a `logs/detection.log` line.
+  - [x] With `TARPIT_DETECTION_ENABLED=false` but abuse enabled: 429s still happen, `logs/abuse.log` still receives lines, and no call to `flag_for_detection` leaks state (verify by sending a slow-paced follow-up request from the same IP and asserting it is NOT flagged with `prior_maze_visit`).
 - **Notes:** Verifies REQ-SWITCH-01/02, REQ-SIG-04. Mirror `tests/test_detection_switch.py` for style and layout.
 
 ## T10 — README documentation
@@ -108,11 +108,11 @@
 - **Depends on:** T7
 - **Parallel group:** C
 - **Acceptance:**
-  - [ ] New `## Abuse protection (v2.2)` section parallel in structure to the existing `## Detection (v2.1)` section (Q-RESOLVED-7).
-  - [ ] Configuration table listing all eight `TARPIT_` env vars from T1 with defaults and one-line descriptions.
-  - [ ] Short explanation of the four reasons that appear in `logs/abuse.log` and how to tail it.
-  - [ ] Explicit callout of the reverse-proxy caveat (Q-OPEN-1): behind a proxy without trusted-header parsing, per-IP caps collapse to global caps; defaults are tuned for a local single-user deployment and MUST be re-tuned before any public deployment.
-  - [ ] Note that the two layers are independently togglable and reference both env flags.
+  - [x] New `## Abuse protection (v2.2)` section parallel in structure to the existing `## Detection (v2.1)` section (Q-RESOLVED-7).
+  - [x] Configuration table listing all eight `TARPIT_` env vars from T1 with defaults and one-line descriptions.
+  - [x] Short explanation of the four reasons that appear in `logs/abuse.log` and how to tail it.
+  - [x] Explicit callout of the reverse-proxy caveat (Q-OPEN-1): behind a proxy without trusted-header parsing, per-IP caps collapse to global caps; defaults are tuned for a local single-user deployment and MUST be re-tuned before any public deployment.
+  - [x] Note that the two layers are independently togglable and reference both env flags.
 - **Notes:** No code changes. Pure documentation.
 
 ---
