@@ -217,3 +217,78 @@ The two writers (`AccessLogWriter`, `DetectionLogWriter`) each hold an `asyncio.
 - `uv run pytest -q` runs the full suite. Tests mirror the source tree under `tests/`.
 - Tests describe behavior, not implementation (see `CLAUDE.md`). If a test fails, fix the code — don't adjust the test unless the behavior being specified has intentionally changed.
 - Every new route needs a test before it's considered done.
+
+---
+
+## Abuse protection (v2.2)
+
+v2.2 adds a rate-limiting and concurrency-capping layer that runs **before** detection. Where detection answers "is this a bot?", abuse protection answers "how much work will we do for this client?".
+
+Any request that exceeds a limit receives HTTP 429 (empty body). The limited IP is simultaneously flagged in the detection state so subsequent requests — if they fall back under the limit — enter the maze instead of getting a plain 429.
+
+### Kill switch
+
+`TARPIT_ABUSE_PROTECTION_ENABLED` (default `true`) controls the entire abuse-protection subsystem. The two kill switches are **independent**: disabling one does not affect the other.
+
+```sh
+# Disable abuse protection only (detection still runs)
+TARPIT_ABUSE_PROTECTION_ENABLED=false uv run tarpit
+
+# Disable detection only (abuse protection still runs)
+TARPIT_DETECTION_ENABLED=false uv run tarpit
+```
+
+### Abuse-protection settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TARPIT_ABUSE_PROTECTION_ENABLED` | `true` | Master kill switch for all abuse protection |
+| `TARPIT_ABUSE_LOG_PATH` | `logs/abuse.log` | Path for the limit-breach event log |
+| `TARPIT_RL_PER_IP_BUDGET` | `120` | Max requests per IP per window before 429 (2× the detection budget so detection flags first) |
+| `TARPIT_RL_PER_IP_WINDOW_S` | `60.0` | Sliding window length in seconds for per-IP rate |
+| `TARPIT_RL_STATE_MAX_ENTRIES` | `10000` | LRU cap on per-IP state table (entries) |
+| `TARPIT_CC_PER_IP_MAX` | `10` | Max concurrent in-flight `/maze/*` requests per IP |
+| `TARPIT_GL_INFLIGHT_MAX` | `500` | Max concurrent in-flight requests globally |
+| `TARPIT_GL_RATE_BUDGET` | `1000` | Max requests globally per window before 429 |
+| `TARPIT_GL_WINDOW_S` | `60.0` | Sliding window length in seconds for global rate |
+
+### Limit-breach log
+
+When any limit is breached, one JSON line is appended to `logs/abuse.log`:
+
+```json
+{"ts": "2026-10-23T14:00:00Z", "ip": "203.0.113.7", "ua": "BadBot/1.0", "path": "/maze/abc", "reason": "per_ip_rate"}
+```
+
+Fields: `ts` (ISO-8601 UTC), `ip`, `ua` (or `null`), `path`, `reason`.
+
+The `reason` field records which limit was tripped first:
+
+| Reason | Meaning |
+|--------|---------|
+| `per_ip_rate` | Source IP exceeded its per-IP request rate budget |
+| `per_ip_concurrency` | Source IP has too many concurrent in-flight `/maze/*` requests |
+| `global_inflight` | Total in-flight request count across all IPs reached the global cap |
+| `global_rate` | Total request rate across all IPs exceeded the global budget |
+
+Limits are evaluated in the order shown above; the first one that fires determines the reason.
+
+Tail the log in real time alongside the detection log:
+
+```sh
+tail -F logs/abuse.log logs/detection.log
+```
+
+### Reverse-proxy caveat
+
+> **Important before any public deployment.**
+
+The service reads client IP from `request.client.host`. Behind a reverse proxy that does not forward trusted client-IP headers, every request appears to come from the **proxy's IP address**. In that configuration, per-IP caps (`TARPIT_RL_PER_IP_BUDGET`, `TARPIT_CC_PER_IP_MAX`) effectively become additional global caps — a single human user behind a shared proxy can trip them.
+
+The default thresholds are tuned for a **local, single-user deployment** only. Before any public deployment:
+
+1. Set up trusted-header IP extraction (a separate v2 item, not yet landed).
+2. Re-tune all eight `TARPIT_*` thresholds for the expected traffic profile.
+3. Test with realistic concurrency before going live.
+
+Until step 1 lands, running this service behind a reverse proxy without trusted-header parsing is **unsupported**.
