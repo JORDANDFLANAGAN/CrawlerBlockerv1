@@ -165,3 +165,55 @@ tail -F logs/access.log logs/detection.log
 **Detection state is per-process and in-memory.** `main.py` enforces `workers=1` in its uvicorn call. Raising `--workers` above 1 would give each worker its own isolated state table, defeating detection entirely — a bot rotating between workers would trip neither. **Do not change `workers=1` in v2.x.**
 
 This constraint will be revisited when detection state is externalized (a v3+ concern).
+
+---
+
+## Architecture (for contributors)
+
+### Code layout
+
+```
+src/tarpit/
+├── main.py            # create_app(), lifespan, uvicorn entrypoint
+├── settings.py        # pydantic-settings, TARPIT_ prefix
+├── dependencies.py    # FastAPI Depends() wiring for app.state
+├── markov.py          # MarkovChain — deterministic word generator
+├── ids.py             # hex id generator for outgoing maze links
+├── renderer.py        # HTML / robots.txt templates
+├── access_log.py      # AccessLogWriter — async-locked JSONL append
+├── corpus.txt         # Markov training text
+├── routers/
+│   ├── root.py        # GET / and GET /robots.txt
+│   └── maze.py        # GET /maze/{id} + reusable generate_maze_response()
+└── detection/
+    ├── middleware.py  # the HTTP middleware; wires signals → action
+    ├── signals.py     # evaluate_request() — pure signal evaluation
+    ├── state.py       # DetectionStateStore — LRU per-IP table
+    └── log.py         # DetectionLogWriter — async-locked JSONL append
+```
+
+Specs that drive the work live under `specs/bot-detection/` (`requirements.md` → `design.md` → `tasks.md` → implementation). `design.md` holds the frozen contracts; prefer updating a spec over patching code when a contract needs to change.
+
+### Determinism
+
+`/maze/{id}` is deterministic by design: the `id` seeds `random.Random`, which drives both the Markov walk and the choice of outgoing link ids. Same id in → byte-identical body out. This is what makes the "same URL returns identical body" verify step work, and it's what lets a crawler's deduplication *not* save it — every id looks like a fresh page.
+
+### Request flow with detection enabled
+
+For every request, `detection_middleware` runs before the router:
+
+1. If `detection_enabled` is false, or path is `/robots.txt`, pass through unchanged.
+2. Read client IP; take a `time.monotonic()` timestamp.
+3. `store.record_request(ip, now)` — mutates the sliding-window counter.
+4. `evaluate_request(request, store, now)` — pure read, returns the list of triggered signal ids in the order `[ua_missing | ua_known_bot_pattern, rate_exceeded, prior_maze_visit]`.
+5. `store.mark_maze_visit(ip)` **if and only if** the path starts with `/maze/`. This happens *after* evaluation so the current request can't trip `prior_maze_visit` for itself — it only taints *future* requests from that IP.
+6. If any signal fired: write one line to `detection.log`, then either forward to the router (maze paths) or synthesize maze content inline via `generate_maze_response(seed=BAIT_ID, …)` (non-maze paths, HTTP 200, no redirect).
+7. Otherwise, pass through to the router.
+
+The two writers (`AccessLogWriter`, `DetectionLogWriter`) each hold an `asyncio.Lock` around the file append, which is why the service is single-worker — the locks only serialize within one process.
+
+### Testing
+
+- `uv run pytest -q` runs the full suite. Tests mirror the source tree under `tests/`.
+- Tests describe behavior, not implementation (see `CLAUDE.md`). If a test fails, fix the code — don't adjust the test unless the behavior being specified has intentionally changed.
+- Every new route needs a test before it's considered done.
