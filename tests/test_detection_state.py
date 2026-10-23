@@ -204,3 +204,53 @@ def test_no_locks_in_state_module() -> None:
     assert "threading" not in source, "state.py must not import threading"
     assert "asyncio.Lock" not in source, "state.py must not use asyncio.Lock"
     assert "asyncio.RLock" not in source, "state.py must not use asyncio.RLock"
+
+
+# --- Tests for flag_for_detection ---
+
+def test_flag_for_detection_creates_record_for_unknown_ip() -> None:
+    """flag_for_detection on an unknown IP creates a record."""
+    store = DetectionStateStore(max_entries=100, window_seconds=60.0, rate_budget=10)
+    store.flag_for_detection("1.2.3.4", now=100.0)
+    assert len(store) == 1
+    assert store.has_prior_maze_visit("1.2.3.4") is True
+
+
+def test_flag_for_detection_sets_flag_on_known_ip() -> None:
+    """flag_for_detection on an existing IP flips has_visited_maze."""
+    store = DetectionStateStore(max_entries=100, window_seconds=60.0, rate_budget=10)
+    store.record_request("1.2.3.4", now=100.0)
+    assert store.has_prior_maze_visit("1.2.3.4") is False
+    store.flag_for_detection("1.2.3.4", now=101.0)
+    assert store.has_prior_maze_visit("1.2.3.4") is True
+
+
+def test_flag_for_detection_lru_eviction_fires() -> None:
+    """flag_for_detection triggers LRU eviction when the new record pushes size over max_entries."""
+    max_entries = 3
+    store = DetectionStateStore(max_entries=max_entries, window_seconds=60.0, rate_budget=10)
+    store.record_request("a", now=1.0)
+    store.record_request("b", now=2.0)
+    store.record_request("c", now=3.0)
+    assert len(store) == max_entries
+    # "a" is LRU; flag_for_detection on new IP "d" should evict "a"
+    store.flag_for_detection("d", now=4.0)
+    assert len(store) == max_entries
+    assert store.has_prior_maze_visit("a") is False  # evicted
+    assert store.has_prior_maze_visit("d") is True
+
+
+def test_flag_for_detection_touches_lru_for_known_ip() -> None:
+    """flag_for_detection on a known IP moves it to most-recently-used."""
+    max_entries = 3
+    store = DetectionStateStore(max_entries=max_entries, window_seconds=60.0, rate_budget=10)
+    store.record_request("a", now=1.0)
+    store.record_request("b", now=2.0)
+    store.record_request("c", now=3.0)
+    # Touch "a" via flag_for_detection — now "b" is LRU
+    store.flag_for_detection("a", now=4.0)
+    # Insert "d" — "b" (LRU) should be evicted, not "a"
+    store.record_request("d", now=5.0)
+    assert len(store) == max_entries
+    assert store.has_prior_maze_visit("b") is False  # evicted
+    assert store.has_prior_maze_visit("a") is True   # still present
