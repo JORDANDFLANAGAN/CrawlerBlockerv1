@@ -1,6 +1,23 @@
-# Tar Pit v1
+# Tar Pit
 
-A crawler trap: compliant bots stay out via `robots.txt`; non-compliant ones enter an infinite maze of delayed pages.
+A three-layer defence against unwanted automated traffic. Polite crawlers are kept out by `robots.txt`. Impolite ones get wasted — pulled into an endless maze of slow, machine-generated pages. Clients that flood the service too hard get a cheap `429 Too Many Requests` instead, so they can't tie the server up.
+
+## What it achieves
+
+- **Honest crawlers (Googlebot, etc.) are unaffected.** They read `robots.txt`, see `/maze/` is disallowed, and move on. The site stays indexable.
+- **Scrapers that ignore `robots.txt` get stuck.** Every page they fetch has 5–10 hidden links to further pages. Every page takes 2–5 seconds to serve. There is no exit. Their crawl budget drains while they get only auto-generated nonsense.
+- **High-rate attackers get denied cheaply.** An IP that opens too many simultaneous connections or sends too many requests gets a 1–2 ms `429` — no delay, no content generation, no CPU spent. The expensive tarpit is reserved for traffic that actually warrants wasting.
+- **The two defences cooperate.** When abuse protection denies a client, it flags that IP so follow-up requests from the same client — once they slow down — fall into the maze instead of just getting more 429s. Denial first, deception second.
+
+## How it achieves it
+
+Three independent layers sit in front of the application, in this order:
+
+1. **Abuse protection (v2.2)** — cheap first. Counts requests per IP and globally; caps concurrent in-flight requests per IP and globally. First limit breached → `429`, done in milliseconds.
+2. **Detection (v2.1)** — if abuse protection let the request through, look for bot signals: missing `User-Agent`, obvious bot keywords in the UA, high per-IP rate, or a prior visit to `/maze/`. Any hit → route the request into maze content, even if it was asking for `/`.
+3. **Tar pit (v1)** — the actual trap. For any `/maze/{id}` request, generate 2–5 s of synthetic HTML seeded by the id (same id = same page, deterministic). The HTML contains 5–10 fresh outgoing `/maze/*` links. There is no termination condition.
+
+A single-process FastAPI service runs all three. All state is in-memory — no database, no Redis — which is why `workers=1` is enforced.
 
 ## Install
 
@@ -15,6 +32,85 @@ uv run tarpit
 ```
 
 This starts the service on `127.0.0.1:8000` with a **single uvicorn worker** (the default). Do **not** raise `--workers` in v1 — the append-only access log is not safe under multiple workers.
+
+## Demo
+
+A ~30-second walk-through that shows all three layers working. With the server running, open a second terminal and run each block in order.
+
+**1. Baseline — the three endpoints work.**
+
+```sh
+curl -s http://127.0.0.1:8000/robots.txt
+# User-agent: *
+# Disallow: /maze/
+
+curl -s -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}\n" http://127.0.0.1:8000/
+# HTTP 200  bytes=226         (root bait page)
+
+curl -s -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}  time=%{time_total}s\n" http://127.0.0.1:8000/maze/deadbeef
+# HTTP 200  bytes≈1800  time≈3.5s   (2–5s delay, Markov content)
+```
+
+**2. Trip the per-IP concurrency cap.** Default `TARPIT_CC_PER_IP_MAX=10`. Fire 15 concurrent `/maze/*` requests — expect exactly 10× `200` (slow) and 5× `429` (instant).
+
+```sh
+for i in $(seq 1 15); do
+  curl -s -o /dev/null -w "req=$i status=%{http_code} time=%{time_total}s\n" \
+    "http://127.0.0.1:8000/maze/abc${i}" &
+done
+wait
+```
+
+Expected (order will vary):
+
+```
+req=11 status=429 time=0.001s      ← abuse protection, instant
+req=12 status=429 time=0.001s
+req=13 status=429 time=0.002s
+req=14 status=429 time=0.001s
+req=15 status=429 time=0.001s
+req=4  status=200 time=2.28s       ← passed; paid the 2–5s delay
+req=8  status=200 time=2.30s
+req=1  status=200 time=2.61s
+...
+```
+
+**3. Inspect `logs/abuse.log` — the 429s were recorded.**
+
+```sh
+cat logs/abuse.log
+# {"ts":"2026-10-23T14:07:01Z","ip":"127.0.0.1","ua":"curl/8.7.1","path":"/maze/abc11","reason":"per_ip_concurrency"}
+# {"ts":"2026-10-23T14:07:01Z","ip":"127.0.0.1","ua":"curl/8.7.1","path":"/maze/abc12","reason":"per_ip_concurrency"}
+# ... (5 lines total, one per 429)
+```
+
+**4. Signal flow: abuse → detection.** Your IP has now been flagged. The next request to `/` — a plain, non-maze path — should serve maze content instead of the normal 226-byte root page.
+
+```sh
+curl -s -o /dev/null -w "HTTP %{http_code}  bytes=%{size_download}  time=%{time_total}s\n" http://127.0.0.1:8000/
+# HTTP 200  bytes≈1600  time≈4.7s   ← maze content served inline, not the root bait
+```
+
+Confirm in `logs/detection.log`:
+
+```sh
+tail -1 logs/detection.log
+# {"ts":"...","ip":"127.0.0.1","ua":"curl/8.7.1","path":"/","triggers":["prior_maze_visit"]}
+```
+
+**5. `/robots.txt` is never limited.** Even after being flagged:
+
+```sh
+curl -s -o /dev/null -w "HTTP %{http_code}  time=%{time_total}s\n" http://127.0.0.1:8000/robots.txt
+# HTTP 200  time=0.002s
+```
+
+**What you just saw:**
+- Layer 1 denied the flood cheaply (429s in ~1 ms, no CPU spent on Markov).
+- Layer 1 signalled Layer 2 one-way — same IP, follow-up request, different behaviour.
+- Layer 2 served maze content inline on a non-maze path (deception, not denial).
+- Layer 3 produced deterministic, link-filled HTML with a visible delay.
+- Compliant-crawler contract (`/robots.txt`) was preserved throughout.
 
 ## Endpoints
 
@@ -165,6 +261,115 @@ tail -F logs/access.log logs/detection.log
 **Detection state is per-process and in-memory.** `main.py` enforces `workers=1` in its uvicorn call. Raising `--workers` above 1 would give each worker its own isolated state table, defeating detection entirely — a bot rotating between workers would trip neither. **Do not change `workers=1` in v2.x.**
 
 This constraint will be revisited when detection state is externalized (a v3+ concern).
+
+---
+
+## How it works (in plain Python)
+
+Three mechanisms, each simpler than it looks. No external services, no new dependencies past FastAPI itself.
+
+### Dependencies
+
+The whole thing runs on four runtime dependencies plus the standard library:
+
+| Dependency | Why it's here |
+|---|---|
+| `fastapi` | HTTP routing + middleware; the shape of the whole app |
+| `uvicorn` | ASGI server that actually runs it |
+| `pydantic-settings` | Reads `TARPIT_*` env vars into a typed `Settings` object |
+| `jinja2` | Renders `/maze/{id}` HTML from a template |
+
+Everything else — the sliding windows, the LRU state tables, the Markov chain, the async-locked file writers — is built from `collections.OrderedDict`, `collections.deque`, `asyncio.Lock`, `random.Random`, `time.monotonic()`, and `json`. The project is a demonstration that pure-stdlib data structures carry you a long way before you need Redis or a database.
+
+### Layer 3 — the tar pit (`src/tarpit/routers/maze.py` + `markov.py` + `ids.py`)
+
+**What it does.** Serves a page at `/maze/{id}` that looks like a real page but is generated on the fly, takes 2–5 s to deliver, and contains 5–10 fresh outgoing `/maze/*` links. Every link leads to another identical trap.
+
+**How, in Python.**
+
+1. A one-time startup step reads `corpus.txt` and builds a **Markov chain** — a dictionary mapping each word to the list of words that followed it in the corpus. ~30 lines of code; stored in `app.state.chain`.
+2. On each `/maze/{id}` request, the `id` string is used to seed a `random.Random(id)`. Because the seed is deterministic, the same id produces the exact same page every time — crawler dedup logic can't help, because every id *looks* new.
+3. That seeded `Random` drives:
+   - The Markov walk (~200 words) → body text.
+   - A loop that generates 5–10 fresh hex ids via `secrets.token_hex`-style derivation → outgoing `/maze/{new_id}` links sprinkled through the body.
+4. Before responding, the handler `await asyncio.sleep(random.uniform(2.0, 5.0))` — the delay is what actually wastes the attacker's time; the Markov content just makes it feel like a real site worth crawling.
+5. The response is a Jinja template with the generated text and links interpolated in.
+
+That's the whole trap. There is no "/maze/exit" route. There is no end condition. A crawler that depth-first-walks this will still be walking next week.
+
+### Layer 2 — bot detection (`src/tarpit/detection/`)
+
+**What it does.** Decides whether an incoming request *looks like* a bot. If yes, forces the request into maze content, even if it asked for `/`.
+
+**How, in Python.**
+
+1. **FastAPI HTTP middleware.** `register_detection_middleware(app)` installs a function that FastAPI calls for every request before the router sees it. It takes the request, decides, and either lets it through or synthesises a different response.
+2. **Four signals, in `signals.py`.** Pure functions, no state mutation:
+   - `ua_missing` — `request.headers.get("user-agent")` is `None` or empty.
+   - `ua_known_bot_pattern` — a cheap regex matches `bot|crawler|spider` case-insensitively.
+   - `rate_exceeded` — ask the state store: has this IP sent more than N requests in the last W seconds?
+   - `prior_maze_visit` — ask the state store: has this IP ever fetched `/maze/*`?
+3. **State in `state.py`.** `DetectionStateStore` is a dict keyed by IP. Each entry holds a `collections.deque[float]` of request timestamps and a `has_visited_maze: bool`. Two operations do all the work:
+   - `record_request(ip, now)` — append `now` to the deque; prune timestamps older than `now - window`; move this IP to the end of an `OrderedDict` to track LRU order; evict the oldest IP if the table exceeds its cap.
+   - `is_rate_exceeded(ip, now)` — count remaining timestamps in the deque; compare to budget.
+4. **Deterministic order.** In the middleware: record, then evaluate signals (pure read), then — only if the path was `/maze/*` — mark the IP as having visited the maze. The *after*-evaluation marking is deliberate: a legitimate first-time visitor to `/maze/root` isn't flagged for having visited the maze; only their *next* request is.
+5. **On a flagged request:** write one line to `logs/detection.log`, then either forward the request if it's already heading to the maze, or synthesise maze content inline at whatever path they asked for (HTTP 200, no redirect — bots can see redirects).
+
+The whole module is ~200 lines of Python. No locks are needed because `workers=1` + no `await` inside the state methods means every mutation is atomic by construction.
+
+### Layer 1 — abuse protection (`src/tarpit/abuse/`)
+
+**What it does.** Caps how much work the server will do for any one client, and how much work it will do in total. First limit tripped → `429` in milliseconds; no Markov, no delay, no HTML.
+
+**How, in Python.**
+
+1. **Another FastAPI middleware**, registered *after* detection in `create_app()`. FastAPI runs middleware in reverse registration order, so abuse protection runs *first* at request time — the cheap check wins. Order is covered by a test (`test_abuse_middleware_ordering.py`) so this can't silently regress.
+2. **Four counters, one `AbuseStateStore`:**
+   - Per-IP sliding-window **rate** — same `deque[float]` + prune pattern as detection, different window + budget.
+   - Per-IP **in-flight concurrency** — a plain `int` per IP, incremented on request acceptance and decremented in a `finally` block when `await call_next(request)` returns (or raises).
+   - Global sliding-window **rate** — one shared deque for the whole process.
+   - Global **in-flight concurrency** — one shared `int`.
+3. **Check order inside the middleware:**
+   1. Record the request against the per-IP + global rate windows (always, even for requests about to be denied — otherwise a client stuck at the limit never escalates).
+   2. If per-IP rate exceeded → 429 with reason `per_ip_rate`.
+   3. Else if global rate exceeded → 429 with reason `global_rate`.
+   4. Else try to acquire a per-IP + global in-flight slot. If the per-IP cap is already at max → 429 with reason `per_ip_concurrency`. If the global cap is at max → 429 with reason `global_inflight`.
+   5. Otherwise: call the rest of the stack inside `try: … finally: store.release_slot(ip)` so the counters always decrement, including on exceptions.
+4. **The 429 response is deliberately empty.** No `Retry-After` header (giving a bot the exact resume time defeats the point). `Content-Type: text/plain; charset=utf-8`, `Content-Length: 0`. A single JSON line goes into `logs/abuse.log` naming which limit tripped.
+5. **One-way signal to detection.** On any 429, the middleware calls `detection_store.flag_for_detection(ip, now)` — a thin new method that marks the IP as "has visited the maze". The next request from that IP, if it falls back under the abuse-protection limits, will trip `prior_maze_visit` in Layer 2 and get maze content. Denial first; deception second. The signal is **one-way**: detection never writes back into abuse state, so the two kill switches (`TARPIT_ABUSE_PROTECTION_ENABLED`, `TARPIT_DETECTION_ENABLED`) stay independent.
+
+### Request flow, end to end
+
+```
+                                   ┌─────────────────┐
+      incoming HTTP request ──────▶│  abuse_middle-  │
+                                   │     ware        │
+                                   └────────┬────────┘
+                                            │
+                      429 (empty body) ◀────┤  limit tripped?
+                      + log abuse line      │
+                      + flag IP in          │
+                        detection store     │ no
+                                            ▼
+                                   ┌─────────────────┐
+                                   │ detection_mid-  │
+                                   │    dleware      │
+                                   └────────┬────────┘
+                                            │
+                   maze content served ◀────┤  bot signal fired?
+                   at requested path        │
+                   + log detection line     │ no
+                                            ▼
+                                   ┌─────────────────┐
+                                   │     router      │
+                                   │  /, /maze/{id}, │
+                                   │   /robots.txt   │
+                                   └─────────────────┘
+```
+
+### Why single-worker
+
+All state — per-IP timestamps, in-flight counters, LRU tables, Markov chain, append-only log files — lives in process memory. With `workers=2`, each worker gets its own copy, and a bot bouncing between workers trips neither one's rate limit. The service enforces `workers=1` in `main.py`'s uvicorn call. Externalising state to Redis is the v3 concern; until then, don't change it.
 
 ---
 
