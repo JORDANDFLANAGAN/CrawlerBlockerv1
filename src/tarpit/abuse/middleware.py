@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from fastapi import FastAPI, Request, Response
 
 from tarpit.abuse.log import AbuseLogWriter, AbuseRecord
+from tarpit.abuse.reasons import REASON_GLOBAL_RATE, REASON_PER_IP_RATE
 from tarpit.abuse.state import AbuseStateStore
 from tarpit.settings import get_settings
 
@@ -48,9 +49,9 @@ def register_abuse_middleware(app: FastAPI) -> None:
         breach_reason: str | None = None
 
         if store.is_per_ip_rate_exceeded(ip, now):
-            breach_reason = "per_ip_rate"
+            breach_reason = REASON_PER_IP_RATE
         elif store.is_global_rate_exceeded(now):
-            breach_reason = "global_rate"
+            breach_reason = REASON_GLOBAL_RATE
         else:
             breach_reason = store.try_acquire_slot(ip)
 
